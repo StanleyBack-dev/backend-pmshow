@@ -2,7 +2,272 @@
 # GENERATED FILE (npm run schema:generate) — do not edit
 # ------------------------------------------------------
 
+type AuditEntry {
+  id: ID!
+  actorId: ID
+  actorName: String
+  action: String!
+  entity: String!
+  entityId: String
+  before: JSON
+  after: JSON
+  ip: String
+  createdAt: DateTime!
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type AuditEntryPage {
+  items: [AuditEntry!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+type PermissionOverride {
+  permission: Permission!
+  allowed: Boolean!
+}
+
+"""Capacidade verificada pela API."""
+enum Permission {
+  REPERTOIRE_READ
+  REPERTOIRE_MANAGE
+  MEDIA_UPLOAD
+  MEDIA_DOWNLOAD
+  EVENTS_READ
+  EVENTS_MANAGE
+  ROSTERS_READ_OWN
+  ROSTERS_READ_ALL
+  ROSTERS_MANAGE
+  ROSTERS_PUBLISH
+  MEMBERS_READ
+  MEMBERS_MANAGE
+  ABSENCES_REQUEST
+  ABSENCES_MANAGE
+  NOTIFICATIONS_BROADCAST
+  USERS_MANAGE
+  PERMISSIONS_MANAGE
+  AUDIT_READ
+}
+
+type PermissionMatrix {
+  """O que o usuário pode fazer (padrão do grupo + exceções)."""
+  effective: [Permission!]!
+
+  """O que o grupo concede."""
+  defaults: [Permission!]!
+
+  """Exceções do usuário em relação ao grupo."""
+  overrides: [PermissionOverride!]!
+}
+
+"""Usuário da sessão atual."""
+type SessionUser {
+  id: ID!
+  name: String!
+  username: String!
+  email: String!
+  group: UserGroup!
+
+  """Precisa trocar a senha temporária antes de usar o app."""
+  mustChangePassword: Boolean!
+
+  """Permissões efetivas."""
+  permissions: [Permission!]!
+}
+
+"""Perfil de acesso: Músico, Gestor ou Administrador geral."""
+enum UserGroup {
+  """Músico"""
+  USER
+
+  """Gestor"""
+  ADMIN
+
+  """Administrador geral"""
+  ADMIN_MASTER
+}
+
+type AuthTokens {
+  accessToken: String!
+  accessTokenExpiresAt: DateTime!
+  refreshToken: String!
+  refreshTokenExpiresAt: DateTime!
+}
+
+type LoginResult {
+  accessToken: String!
+  accessTokenExpiresAt: DateTime!
+  refreshToken: String!
+  refreshTokenExpiresAt: DateTime!
+  user: SessionUser!
+}
+
+"""Usuário visto pela administração."""
+type UserAccount {
+  id: ID!
+  name: String!
+  email: String!
+  username: String!
+  group: UserGroup!
+  active: Boolean!
+
+  """Ainda não trocou a senha temporária."""
+  mustChangePassword: Boolean!
+
+  """Bloqueado por tentativas inválidas até esta data."""
+  lockedUntil: DateTime
+  lastLoginAt: DateTime
+  deactivatedAt: DateTime
+  createdAt: DateTime!
+
+  """Bloqueado agora por tentativas inválidas de login."""
+  locked: Boolean!
+}
+
+type UserAccountPage {
+  items: [UserAccount!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+"""Senha temporária, exibida uma única vez para quem a gerou."""
+type TemporaryAccess {
+  user: UserAccount!
+  temporaryPassword: String!
+
+  """Se o e-mail com o acesso foi enviado."""
+  emailSent: Boolean!
+}
+
 type Query {
   """Verifica se a API GraphQL responde."""
   ping: String!
+
+  """Trilha de auditoria, da mais recente para a mais antiga."""
+  auditLogs(filter: AuditFilterInput, page: PageInput): AuditEntryPage!
+  me: SessionUser!
+  users(filter: UserFilterInput, page: PageInput): UserAccountPage!
+  user(id: ID!): UserAccount!
+  userPermissions(id: ID!): PermissionMatrix!
+}
+
+input AuditFilterInput {
+  entity: String
+  entityId: String
+  actorId: ID
+}
+
+input PageInput {
+  page: Int! = 1
+  limit: Int! = 20
+}
+
+input UserFilterInput {
+  search: String
+  group: UserGroup
+  active: Boolean
+}
+
+type Mutation {
+  """Entra com usuário (ou e-mail) e senha."""
+  login(input: LoginInput!): LoginResult!
+
+  """Novo access token a partir do refresh token da sessão."""
+  refreshSessionTokens(refreshToken: String!): AuthTokens!
+
+  """Encerra a sessão atual."""
+  logout: Boolean!
+
+  """
+  Troca a própria senha (inclusive a temporária). Encerra as outras sessões.
+  """
+  changeMyPassword(input: ChangePasswordInput!): Boolean!
+  updateMyProfile(input: UpdateMyProfileInput!): SessionUser!
+
+  """
+  Envia um código por e-mail. Sempre responde true, exista ou não o usuário.
+  """
+  requestPasswordRecovery(login: String!): Boolean!
+
+  """Confere o código e devolve o token para redefinir a senha."""
+  verifyPasswordRecoveryCode(input: VerifyRecoveryCodeInput!): String!
+  resetPasswordWithRecovery(input: ResetPasswordInput!): Boolean!
+
+  """Cria o usuário com senha temporária (enviada por e-mail)."""
+  createUser(input: CreateUserInput!): TemporaryAccess!
+  updateUser(id: ID!, input: UpdateUserInput!): UserAccount!
+
+  """Ativa ou desativa o acesso. Desativar encerra as sessões."""
+  setUserActive(id: ID!, active: Boolean!): UserAccount!
+
+  """Gera nova senha temporária e encerra as sessões do usuário."""
+  resetUserPassword(id: ID!): TemporaryAccess!
+  unlockUser(id: ID!): UserAccount!
+  revokeUserSessions(id: ID!): UserAccount!
+  setUserPermissions(input: SetUserPermissionsInput!): PermissionMatrix!
+}
+
+input LoginInput {
+  """Usuário ou e-mail."""
+  login: String!
+  password: String!
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+input UpdateMyProfileInput {
+  name: String!
+  email: String!
+}
+
+input VerifyRecoveryCodeInput {
+  login: String!
+  code: String!
+}
+
+input ResetPasswordInput {
+  resetToken: String!
+  newPassword: String!
+}
+
+input CreateUserInput {
+  name: String!
+  email: String!
+
+  """Login: 3 a 32 caracteres (a-z, 0-9, ., -, _)."""
+  username: String!
+  group: UserGroup!
+}
+
+input UpdateUserInput {
+  name: String
+  email: String
+  username: String
+  group: UserGroup
+}
+
+input SetUserPermissionsInput {
+  userId: ID!
+
+  """true descarta as exceções e volta ao padrão do grupo."""
+  useGroupDefaults: Boolean!
+
+  """Conjunto completo desejado (ignorado com useGroupDefaults)."""
+  permissions: [Permission!]
 }

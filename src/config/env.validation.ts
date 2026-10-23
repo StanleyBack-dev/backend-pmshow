@@ -26,6 +26,25 @@ export const envValidationSchema = Joi.object({
   // every request.
   CRON_SECRET: Joi.string().min(16).allow("").optional(),
 
+  // === AUTH ===
+  // Signs the short-lived access tokens.
+  JWT_ACCESS_SECRET: Joi.string().min(32).required(),
+  JWT_ACCESS_EXPIRES_IN: Joi.string().default("15m"),
+  // Days a session stays valid without use (slides on every refresh).
+  REFRESH_TOKEN_TTL_DAYS: Joi.number().integer().min(1).max(90).default(30),
+  // HMAC key for refresh secrets, recovery codes and reset tokens (only
+  // digests are stored). Rotating it signs everyone out.
+  AUTH_HASH_SECRET: Joi.string().min(32).required(),
+  AUTH_MAX_FAILED_ATTEMPTS: Joi.number().integer().min(3).max(20).default(5),
+  AUTH_LOCK_MINUTES: Joi.number().integer().min(1).max(1440).default(15),
+
+  // First ADMIN_MASTER, created on boot when the database has none.
+  BOOTSTRAP_ADMIN_MASTER_ENABLED: bool().default(false),
+  BOOTSTRAP_ADMIN_MASTER_NAME: Joi.string().allow("").optional(),
+  BOOTSTRAP_ADMIN_MASTER_EMAIL: Joi.string().email().allow("").optional(),
+  BOOTSTRAP_ADMIN_MASTER_USERNAME: Joi.string().allow("").optional(),
+  BOOTSTRAP_ADMIN_MASTER_PASSWORD: Joi.string().allow("").optional(),
+
   // === MAIL ===
   // `log` only writes to the console (until the Brevo account exists);
   // `brevo` sends for real and then requires the key and the sender.
