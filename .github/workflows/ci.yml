@@ -1,12 +1,25 @@
 name: CI
 
+# Runs on every PR to master (each job is a required status check in the
+# master ruleset — see .github/rulesets/master.json) and on pushes to
+# master/beta, which the deploy and beta-migration workflows wait for.
 on:
   pull_request:
+    branches: [master]
   push:
     branches: [master, beta]
 
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the run that became outdated.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  check:
+  format:
+    name: format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,9 +28,67 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lint:check
+      - name: Prettier
+        run: npx prettier --check .
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: ESLint (includes the layer rules)
+        run: npm run lint:check
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npm run typecheck
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npm test
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npm run build
-      - name: schema.gql em dia com os resolvers
+
+  schema:
+    name: schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: schema.gql up to date with the resolvers
         run: npm run schema:check

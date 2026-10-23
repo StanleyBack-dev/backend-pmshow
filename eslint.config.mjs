@@ -21,8 +21,8 @@ export default [
       "@typescript-eslint/no-explicit-any": "warn",
     },
   },
-  // Camadas: o domínio é puro (sem framework/persistência) e a aplicação
-  // depende apenas de portas — nunca de adapters concretos.
+  // Layers: the domain is pure (no framework/persistence) and the
+  // application depends only on ports — never on concrete adapters.
   {
     files: ["src/modules/**/domain/**/*.ts", "src/shared/domain/**/*.ts"],
     rules: {
@@ -39,7 +39,7 @@ export default [
                 "@/modules/*/application/**",
               ],
               message:
-                "Domain deve ser puro e nao pode depender de framework, persistencia, aplicacao ou apresentacao.",
+                "Domain must be pure: no framework, persistence, application or presentation imports.",
             },
           ],
         },
@@ -60,7 +60,7 @@ export default [
                 "@/modules/*/presentation/**",
               ],
               message:
-                "Application deve depender de portas/contratos e nao de implementacoes concretas.",
+                "Application must depend on ports/contracts, not on concrete implementations.",
             },
           ],
         },
