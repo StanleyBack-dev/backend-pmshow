@@ -26,6 +26,19 @@ src/modules/<módulo>/
 - Proteções do GraphQL: introspecção desligada em produção, sem playground e
   com limite de profundidade das queries (`depthLimitRule`).
 
+### Módulos
+
+| Módulo           | Responsabilidade                                                                                                                                                     |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `identity`       | Usuários, credenciais (scrypt), sessões (access JWT + refresh revogável), primeiro acesso, recuperação de senha, bloqueio por tentativas e bootstrap do ADMIN_MASTER |
+| `access-control` | Grupos (`USER`, `ADMIN`, `ADMIN_MASTER`), permissões padrão por grupo, exceções por usuário, `PermissionsGuard` + `@RequirePermissions`                              |
+| `audit`          | Trilha de auditoria das ações administrativas (a leitura exige `AUDIT_READ`)                                                                                         |
+| `mails`          | Provider (log ou Brevo) + templates                                                                                                                                  |
+
+Guards globais, nesta ordem: chave interna do BFF → sessão → primeiro acesso
+(senha temporária) → permissões. As permissões são lidas a cada requisição, então
+uma revogação vale na hora, sem esperar o token expirar.
+
 ### Schema
 
 O schema é gerado a partir dos resolvers. O arquivo `src/graphql/schema.gql`,
@@ -48,8 +61,10 @@ Brevo existir). `MAIL_DRIVER=brevo` envia de verdade e exige `BREVO_API_KEY` e
 ```bash
 npm install
 cp .env.example .env.local        # preencha os valores
-npm run secrets:generate          # INTERNAL_API_KEY, CRON_SECRET
+npm run secrets:generate          # INTERNAL_API_KEY, CRON_SECRET, JWT_ACCESS_SECRET, AUTH_HASH_SECRET
 npm run migration:run
+# primeiro admin: preencha BOOTSTRAP_ADMIN_MASTER_* com ENABLED=true, suba a API
+# uma vez e depois volte para ENABLED=false
 npm run start:dev                 # http://localhost:4000/graphql
 ```
 
