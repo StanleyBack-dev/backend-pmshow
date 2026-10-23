@@ -152,6 +152,183 @@ type TemporaryAccess {
   emailSent: Boolean!
 }
 
+type MediaAsset {
+  id: ID!
+  songId: ID!
+  kind: MediaKind!
+  status: MediaStatus!
+  title: String!
+  mimeType: String
+  sizeBytes: Float
+  durationSeconds: Int
+
+  """Id do vídeo no YouTube (só VIDEO)."""
+  youtubeVideoId: String
+  thumbnailUrl: String
+  createdAt: DateTime!
+}
+
+enum MediaKind {
+  AUDIO
+  VIDEO
+}
+
+enum MediaStatus {
+  PENDING
+  READY
+}
+
+"""
+Formulário assinado: o navegador envia (POST multipart) os `fields` + o arquivo direto para `url`.
+"""
+type UploadForm {
+  url: String!
+  fields: JSON!
+  expiresAt: DateTime!
+}
+
+type AudioUploadTicket {
+  asset: MediaAsset!
+  upload: UploadForm!
+}
+
+type Song {
+  id: ID!
+  title: String!
+
+  """Compositor ou intérprete."""
+  artist: String
+  arranger: String
+  category: SongCategory!
+
+  """Tonalidade, ex.: Bb."""
+  musicalKey: String
+  bpm: Int
+  durationSeconds: Int
+  lyrics: String
+  notes: String
+  tags: [String!]!
+  archivedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """Áudios e vídeos prontos desta música."""
+  media: [MediaAsset!]!
+}
+
+"""Categoria da música no repertório."""
+enum SongCategory {
+  HINO
+  MARCHA
+  DOBRADO
+  MPB
+  SAMBA_PAGODE
+  SERTANEJO
+  FORRO
+  GOSPEL
+  POP_ROCK
+  INSTRUMENTAL
+  INFANTIL
+  OUTRO
+}
+
+type SongPage {
+  items: [Song!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+type Instrument {
+  id: ID!
+  name: String!
+  section: Section!
+  archived: Boolean!
+}
+
+"""Naipe da banda."""
+enum Section {
+  MADEIRAS
+  METAIS
+  PERCUSSAO
+  CORDAS_BASE
+  VOCAL
+  TECNICA
+  APOIO
+}
+
+type MemberInstrument {
+  instrumentId: ID!
+  name: String!
+  primary: Boolean!
+}
+
+"""Cadastro do integrante na banda."""
+type MemberProfile {
+  userId: ID!
+
+  """Nome de guerra."""
+  warName: String!
+  rank: Rank!
+
+  """Matrícula."""
+  registration: String
+
+  """Só dígitos (DDD + número)."""
+  phone: String
+  section: Section!
+  status: MemberStatus!
+  notes: String
+  instruments: [MemberInstrument!]!
+  updatedAt: DateTime!
+}
+
+"""Posto/graduação."""
+enum Rank {
+  SOLDADO
+  CABO
+  TERCEIRO_SARGENTO
+  SEGUNDO_SARGENTO
+  PRIMEIRO_SARGENTO
+  SUBTENENTE
+  CADETE
+  ASPIRANTE
+  SEGUNDO_TENENTE
+  PRIMEIRO_TENENTE
+  CAPITAO
+  MAJOR
+  TENENTE_CORONEL
+  CORONEL
+  CIVIL
+}
+
+"""Situação do integrante na banda."""
+enum MemberStatus {
+  ATIVO
+  AFASTADO
+  INATIVO
+}
+
+"""Usuário com acesso e, quando houver, o cadastro na banda."""
+type RosterEntry {
+  userId: ID!
+  name: String!
+  username: String!
+
+  """Se o acesso ao app está ativo."""
+  active: Boolean!
+  profile: MemberProfile
+}
+
+type RosterPage {
+  items: [RosterEntry!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
 type Query {
   """Verifica se a API GraphQL responde."""
   ping: String!
@@ -162,6 +339,25 @@ type Query {
   users(filter: UserFilterInput, page: PageInput): UserAccountPage!
   user(id: ID!): UserAccount!
   userPermissions(id: ID!): PermissionMatrix!
+
+  """Link temporário para tocar o áudio (válido por pelo menos 1 hora)."""
+  audioPlaybackUrl(assetId: ID!): String!
+
+  """Link temporário que baixa o arquivo de áudio."""
+  audioDownloadUrl(assetId: ID!): String!
+
+  """Todos os usuários com acesso e o cadastro de cada um na banda."""
+  roster(filter: RosterFilterInput, page: PageInput): RosterPage!
+  memberProfile(userId: ID!): MemberProfile
+
+  """O cadastro do próprio usuário na banda."""
+  myMemberProfile: MemberProfile
+  instruments(includeArchived: Boolean! = false): [Instrument!]!
+  songs(filter: SongFilterInput, page: PageInput): SongPage!
+  song(id: ID!): Song!
+
+  """Tags em uso no repertório."""
+  songTags: [String!]!
 }
 
 input AuditFilterInput {
@@ -179,6 +375,25 @@ input UserFilterInput {
   search: String
   group: UserGroup
   active: Boolean
+}
+
+input RosterFilterInput {
+  search: String
+  section: Section
+  status: MemberStatus
+  instrumentId: ID
+
+  """false = só quem ainda não tem cadastro."""
+  withProfile: Boolean
+}
+
+input SongFilterInput {
+  search: String
+  category: SongCategory
+  tag: String
+
+  """Arquivadas (exige REPERTOIRE_MANAGE)."""
+  archived: Boolean! = false
 }
 
 type Mutation {
@@ -218,6 +433,27 @@ type Mutation {
   unlockUser(id: ID!): UserAccount!
   revokeUserSessions(id: ID!): UserAccount!
   setUserPermissions(input: SetUserPermissionsInput!): PermissionMatrix!
+  addYoutubeVideo(input: AddYoutubeVideoInput!): MediaAsset!
+
+  """
+  1º passo do envio de áudio: devolve o formulário assinado para o navegador enviar o arquivo direto ao armazenamento.
+  """
+  requestAudioUpload(input: RequestAudioUploadInput!): AudioUploadTicket!
+
+  """2º passo: confere o arquivo no armazenamento e o publica."""
+  confirmAudioUpload(input: ConfirmAudioUploadInput!): MediaAsset!
+  renameMedia(id: ID!, title: String!): MediaAsset!
+  removeMedia(id: ID!): Boolean!
+
+  """Cria ou atualiza o cadastro do integrante."""
+  saveMemberProfile(userId: ID!, input: MemberProfileInput!): MemberProfile!
+  createInstrument(input: CreateInstrumentInput!): Instrument!
+  updateInstrument(id: ID!, input: UpdateInstrumentInput!): Instrument!
+  createSong(input: SongInput!): Song!
+  updateSong(id: ID!, input: SongInput!): Song!
+
+  """Arquiva (some das listas) ou restaura a música."""
+  setSongArchived(id: ID!, archived: Boolean!): Song!
 }
 
 input LoginInput {
@@ -270,4 +506,70 @@ input SetUserPermissionsInput {
 
   """Conjunto completo desejado (ignorado com useGroupDefaults)."""
   permissions: [Permission!]
+}
+
+input AddYoutubeVideoInput {
+  songId: ID!
+
+  """Link do vídeo (youtube.com, youtu.be, shorts…)."""
+  link: String!
+
+  """Título; sem ele, usa o do YouTube."""
+  title: String
+}
+
+input RequestAudioUploadInput {
+  songId: ID!
+  title: String!
+
+  """Ex.: audio/mpeg."""
+  mimeType: String!
+  sizeBytes: Float!
+}
+
+input ConfirmAudioUploadInput {
+  assetId: ID!
+
+  """Duração lida pelo navegador, em segundos."""
+  durationSeconds: Int
+}
+
+input MemberProfileInput {
+  warName: String!
+  rank: Rank!
+  registration: String
+  phone: String
+  section: Section!
+  status: MemberStatus!
+  notes: String
+  instruments: [MemberInstrumentInput!]!
+}
+
+input MemberInstrumentInput {
+  instrumentId: ID!
+  primary: Boolean! = false
+}
+
+input CreateInstrumentInput {
+  name: String!
+  section: Section!
+}
+
+input UpdateInstrumentInput {
+  name: String
+  section: Section
+  archived: Boolean
+}
+
+input SongInput {
+  title: String!
+  artist: String
+  arranger: String
+  category: SongCategory!
+  musicalKey: String
+  bpm: Int
+  durationSeconds: Int
+  lyrics: String
+  notes: String
+  tags: [String!]! = []
 }

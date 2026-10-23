@@ -60,4 +60,13 @@ export const envValidationSchema = Joi.object({
     otherwise: Joi.string().email().allow("").optional(),
   }),
   MAIL_FROM_NAME: Joi.string().min(2).default("PM SHOW"),
+
+  // === STORAGE (Neon Object Storage, S3-compatible, per Neon branch) ===
+  // Without these the API still boots; only media uploads/playback fail.
+  AWS_ENDPOINT_URL_S3: Joi.string().uri().allow("").optional(),
+  AWS_REGION: Joi.string().allow("").optional(),
+  AWS_S3_BUCKET: Joi.string().allow("").optional(),
+  AWS_ACCESS_KEY_ID: Joi.string().allow("").optional(),
+  AWS_SECRET_ACCESS_KEY: Joi.string().allow("").optional(),
+  MEDIA_MAX_AUDIO_MB: Joi.number().integer().min(1).max(200).default(50),
 });

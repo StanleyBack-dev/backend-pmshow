@@ -14,6 +14,7 @@ import { SESSION_REPOSITORY } from "@/modules/identity/application/ports/session
 import { USER_REPOSITORY } from "@/modules/identity/application/ports/user-repository.port";
 import { VERIFICATION_CODE_REPOSITORY } from "@/modules/identity/application/ports/verification-code-repository.port";
 import { SessionTokensService } from "@/modules/identity/application/session-tokens.service";
+import { UserLookupService } from "@/modules/identity/application/user-lookup.service";
 import { BootstrapAdminMasterUseCase } from "@/modules/identity/application/use-cases/bootstrap-admin-master.use-case";
 import { LoginUseCase } from "@/modules/identity/application/use-cases/login.use-case";
 import {
@@ -72,6 +73,7 @@ import { MailModule } from "@/modules/mails/mail.module";
     PasswordService,
     SessionTokensService,
     UserManagementPolicy,
+    UserLookupService,
     // use cases
     AuthenticateUseCase,
     LoginUseCase,
@@ -104,7 +106,7 @@ import { MailModule } from "@/modules/mails/mail.module";
     UserSessionGuard,
     FirstAccessGuard,
   ],
-  exports: [UserSessionGuard, FirstAccessGuard],
+  exports: [UserSessionGuard, FirstAccessGuard, UserLookupService],
 })
 export class IdentityModule implements OnApplicationBootstrap {
   constructor(private readonly bootstrapAdmin: BootstrapAdminMasterUseCase) {}

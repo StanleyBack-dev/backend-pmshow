@@ -16,6 +16,9 @@ import { IdentityModule } from "@/modules/identity/identity.module";
 import { FirstAccessGuard } from "@/modules/identity/presentation/guards/first-access.guard";
 import { UserSessionGuard } from "@/modules/identity/presentation/guards/user-session.guard";
 import { MailModule } from "@/modules/mails/mail.module";
+import { MediaModule } from "@/modules/media/media.module";
+import { MembersModule } from "@/modules/members/members.module";
+import { RepertoireModule } from "@/modules/repertoire/repertoire.module";
 import { SharedModule } from "@/shared/shared.module";
 
 @Module({
@@ -29,6 +32,9 @@ import { SharedModule } from "@/shared/shared.module";
     AuditModule,
     AccessControlModule,
     IdentityModule,
+    MembersModule,
+    RepertoireModule,
+    MediaModule,
   ],
   providers: [
     AppResolver,
