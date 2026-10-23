@@ -17,6 +17,7 @@ export type SongData = Omit<
 export interface SongRepositoryPort {
   list(filter: SongFilter, page: PageRequest): Promise<Paginated<Song>>;
   findById(id: string): Promise<Song | null>;
+  findByIds(ids: readonly string[]): Promise<Song[]>;
   create(data: SongData, createdBy: string): Promise<Song>;
   update(id: string, data: Partial<SongData>): Promise<Song>;
   setArchived(id: string, archivedAt: Date | null): Promise<Song>;

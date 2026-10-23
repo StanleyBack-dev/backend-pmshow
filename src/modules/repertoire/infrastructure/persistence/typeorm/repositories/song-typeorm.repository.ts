@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Brackets, type Repository } from "typeorm";
+import { Brackets, In, type Repository } from "typeorm";
 import type {
   SongData,
   SongFilter,
@@ -83,6 +83,12 @@ export class SongTypeormRepository implements SongRepositoryPort {
   async findById(id: string): Promise<Song | null> {
     const row = await this.repository.findOne({ where: { id } });
     return row ? toSong(row) : null;
+  }
+
+  async findByIds(ids: readonly string[]): Promise<Song[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.repository.find({ where: { id: In([...ids]) } });
+    return rows.map(toSong);
   }
 
   async create(data: SongData, createdBy: string): Promise<Song> {

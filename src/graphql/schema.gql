@@ -33,6 +33,121 @@ type AuditEntryPage {
   totalPages: Int!
 }
 
+"""Local de apresentação."""
+type Venue {
+  id: ID!
+  name: String!
+  address: String
+  city: String!
+  mapsUrl: String
+  notes: String
+  archived: Boolean!
+}
+
+"""Apresentação, desfile, ensaio…"""
+type Event {
+  id: ID!
+  title: String!
+  type: EventType!
+  status: EventStatus!
+
+  """Concentração."""
+  callTime: DateTime
+  startsAt: DateTime!
+  endsAt: DateTime
+  venueId: ID
+
+  """Uniforme / traje."""
+  uniform: String
+
+  """Quem solicitou."""
+  requester: String
+
+  """Nº do ofício."""
+  documentRef: String
+  notes: String
+  cancellationReason: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  venue: Venue
+  setlist: [SetlistEntry!]!
+}
+
+"""Tipo de apresentação ou compromisso."""
+enum EventType {
+  SHOW
+  DESFILE
+  SOLENIDADE
+  FORMATURA
+  ENSAIO
+  CULTO_MISSA
+  OUTRO
+}
+
+enum EventStatus {
+  PLANEJADO
+  CONFIRMADO
+  REALIZADO
+  CANCELADO
+}
+
+type SetlistEntry {
+  position: Int!
+  songId: ID!
+  notes: String
+
+  """null se a música foi apagada."""
+  song: Song
+}
+
+type Song {
+  id: ID!
+  title: String!
+
+  """Compositor ou intérprete."""
+  artist: String
+  arranger: String
+  category: SongCategory!
+
+  """Tonalidade, ex.: Bb."""
+  musicalKey: String
+  bpm: Int
+  durationSeconds: Int
+  lyrics: String
+  notes: String
+  tags: [String!]!
+  archivedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """Áudios e vídeos prontos desta música."""
+  media: [MediaAsset!]!
+}
+
+"""Categoria da música no repertório."""
+enum SongCategory {
+  HINO
+  MARCHA
+  DOBRADO
+  MPB
+  SAMBA_PAGODE
+  SERTANEJO
+  FORRO
+  GOSPEL
+  POP_ROCK
+  INSTRUMENTAL
+  INFANTIL
+  OUTRO
+}
+
+type SongPage {
+  items: [Song!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
 type PermissionOverride {
   permission: Permission!
   allowed: Boolean!
@@ -192,54 +307,6 @@ type AudioUploadTicket {
   upload: UploadForm!
 }
 
-type Song {
-  id: ID!
-  title: String!
-
-  """Compositor ou intérprete."""
-  artist: String
-  arranger: String
-  category: SongCategory!
-
-  """Tonalidade, ex.: Bb."""
-  musicalKey: String
-  bpm: Int
-  durationSeconds: Int
-  lyrics: String
-  notes: String
-  tags: [String!]!
-  archivedAt: DateTime
-  createdAt: DateTime!
-  updatedAt: DateTime!
-
-  """Áudios e vídeos prontos desta música."""
-  media: [MediaAsset!]!
-}
-
-"""Categoria da música no repertório."""
-enum SongCategory {
-  HINO
-  MARCHA
-  DOBRADO
-  MPB
-  SAMBA_PAGODE
-  SERTANEJO
-  FORRO
-  GOSPEL
-  POP_ROCK
-  INSTRUMENTAL
-  INFANTIL
-  OUTRO
-}
-
-type SongPage {
-  items: [Song!]!
-  total: Int!
-  page: Int!
-  limit: Int!
-  totalPages: Int!
-}
-
 type Instrument {
   id: ID!
   name: String!
@@ -335,6 +402,14 @@ type Query {
 
   """Trilha de auditoria, da mais recente para a mais antiga."""
   auditLogs(filter: AuditFilterInput, page: PageInput): AuditEntryPage!
+
+  """Eventos por período (ordenados pelo início, até 500)."""
+  events(filter: EventFilterInput): [Event!]!
+
+  """Próximos eventos planejados ou confirmados."""
+  upcomingEvents(limit: Int! = 5): [Event!]!
+  event(id: ID!): Event!
+  venues(includeArchived: Boolean! = false): [Venue!]!
   me: SessionUser!
   users(filter: UserFilterInput, page: PageInput): UserAccountPage!
   user(id: ID!): UserAccount!
@@ -371,6 +446,16 @@ input PageInput {
   limit: Int! = 20
 }
 
+input EventFilterInput {
+  """Início a partir de."""
+  from: DateTime
+
+  """Início antes de."""
+  to: DateTime
+  statuses: [EventStatus!]
+  type: EventType
+}
+
 input UserFilterInput {
   search: String
   group: UserGroup
@@ -397,6 +482,17 @@ input SongFilterInput {
 }
 
 type Mutation {
+  createEvent(input: EventInput!): Event!
+  updateEvent(id: ID!, input: EventInput!): Event!
+
+  """Confirma, cancela (com motivo), reabre ou marca como realizado."""
+  changeEventStatus(id: ID!, status: EventStatus!, reason: String): Event!
+
+  """Substitui o setlist do evento pela lista, na ordem dada."""
+  setEventSetlist(id: ID!, input: SetlistInput!): [SetlistEntry!]!
+  createVenue(input: VenueInput!): Venue!
+  updateVenue(id: ID!, input: VenueInput!): Venue!
+
   """Entra com usuário (ou e-mail) e senha."""
   login(input: LoginInput!): LoginResult!
 
@@ -454,6 +550,39 @@ type Mutation {
 
   """Arquiva (some das listas) ou restaura a música."""
   setSongArchived(id: ID!, archived: Boolean!): Song!
+}
+
+input EventInput {
+  title: String!
+  type: EventType!
+  callTime: DateTime
+  startsAt: DateTime!
+  endsAt: DateTime
+  venueId: ID
+  uniform: String
+  requester: String
+  documentRef: String
+  notes: String
+}
+
+input SetlistInput {
+  items: [SetlistItemInput!]!
+}
+
+input SetlistItemInput {
+  songId: ID!
+  notes: String
+}
+
+input VenueInput {
+  name: String!
+  address: String
+
+  """Padrão: Goiânia."""
+  city: String
+  mapsUrl: String
+  notes: String
+  archived: Boolean
 }
 
 input LoginInput {
