@@ -48,10 +48,10 @@ async function main(): Promise<void> {
   mkdirSync(join(SRC, "graphql"), { recursive: true });
   writeFileSync(
     OUTPUT,
-    `# ------------------------------------------------------\n# ARQUIVO GERADO (npm run schema:generate) — não edite\n# ------------------------------------------------------\n\n${printSchema(schema)}\n`,
+    `# ------------------------------------------------------\n# GENERATED FILE (npm run schema:generate) — do not edit\n# ------------------------------------------------------\n\n${printSchema(schema)}\n`,
   );
   console.log(
-    `schema.gql gerado com ${resolvers.length} resolver(s) de ${files.length} arquivo(s).`,
+    `schema.gql generated from ${resolvers.length} resolver(s) in ${files.length} file(s).`,
   );
 }
 

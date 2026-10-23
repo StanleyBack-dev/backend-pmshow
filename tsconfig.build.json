@@ -5,14 +5,6 @@
     "rootDir": ".",
     "incremental": false
   },
-  "include": [
-    "src/**/*.ts",
-    "serverless.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*spec.ts",
-    "**/__tests__/**"
-  ]
+  "include": ["src/**/*.ts", "serverless.ts"],
+  "exclude": ["node_modules", "dist", "**/*spec.ts", "**/__tests__/**"]
 }
