@@ -1,0 +1,56 @@
+name: Run Beta Database Migrations
+
+# Mirrors the migration-first step in deploy-backend.yml, pointed at the
+# beta Neon branch instead of production. Deliberately does not deploy to
+# Vercel afterwards — beta already redeploys automatically via Vercel's
+# native git integration on push, independent of this workflow.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - beta
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrate-beta-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Run migrations (Beta)
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate beta DB env
+        env:
+          DATABASE_URL: ${{ secrets.BETA_DATABASE_URL }}
+        run: |
+          test -n "$DATABASE_URL" || (echo "Missing secret: BETA_DATABASE_URL" && exit 1)
+
+      # NODE_ENV=production keeps the TypeORM CLI from loading any local env
+      # file; the beta target is decided solely by BETA_DATABASE_URL.
+      - name: Run database migrations (beta, migration-first)
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.BETA_DATABASE_URL }}
+          DB_SSL: "true"
+        run: npm run migration:run:prod

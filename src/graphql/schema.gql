@@ -1,0 +1,10 @@
+# ------------------------------------------------------
+# ARQUIVO GERADO (npm run schema:generate) — não edite
+# ------------------------------------------------------
+
+type Query {
+  """
+  Verifica se a API GraphQL responde.
+  """
+  ping: String!
+}

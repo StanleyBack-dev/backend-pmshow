@@ -1,0 +1,68 @@
+# PM SHOW — Backend
+
+API NestJS + **GraphQL** (Apollo, code-first) do app da banda PM SHOW (Polícia
+Militar de Goiás): repertório, mídias, agenda, escalas e notificações. O plano
+completo está em [`../PLANO.md`](../PLANO.md).
+
+## Arquitetura
+
+DDD modular com Ports & Adapters. Cada módulo tem suas próprias camadas:
+
+```
+src/modules/<módulo>/
+├── domain/                regras puras (sem Nest, TypeORM, GraphQL) — o lint bloqueia esses imports
+├── application/           casos de uso + ports (interfaces) — só depende de ports
+├── infrastructure/        adapters (TypeORM, R2, Brevo, oEmbed)
+└── presentation/graphql/  resolvers + DTOs (@ObjectType / @InputType)
+```
+
+- Um módulo só conversa com outro pelo que ele exporta no `*.module.ts`.
+- O GraphQL fica em `/graphql`. O REST existe só para o health check (`GET /`)
+  e para as rotas `/internal/*` chamadas pelos workflows agendados.
+- Toda requisição precisa do header `X-Internal-Api-Key`: só o BFF (Next.js)
+  conhece essa chave.
+- Os erros chegam como `{ message, extensions: { code, statusCode, details } }`
+  (`AppException` + catálogos em `src/common/exceptions/catalogs`).
+- Proteções do GraphQL: introspecção desligada em produção, sem playground e
+  com limite de profundidade das queries (`depthLimitRule`).
+
+### Schema
+
+O schema é gerado a partir dos resolvers. O arquivo `src/graphql/schema.gql`,
+que o frontend usa para gerar tipos, vem só de:
+
+```bash
+npm run schema:generate   # não precisa de banco
+```
+
+O CI falha se o arquivo estiver desatualizado (`npm run schema:check`).
+
+### E-mail
+
+`MAIL_DRIVER=log` registra os e-mails no console sem enviar (use até a conta
+Brevo existir). `MAIL_DRIVER=brevo` envia de verdade e exige `BREVO_API_KEY` e
+`MAIL_FROM_EMAIL`.
+
+## Rodando localmente
+
+```bash
+npm install
+cp .env.example .env.local        # preencha os valores
+npm run secrets:generate          # INTERNAL_API_KEY, CRON_SECRET
+npm run migration:run
+npm run start:dev                 # http://localhost:4000/graphql
+```
+
+## Deploy (Vercel + Neon)
+
+1. Crie o banco no Neon e copie a connection string **pooled**.
+2. Importe este repositório na Vercel e configure as variáveis do `.env.example` com `NODE_ENV=production`.
+3. O workflow `deploy-backend.yml` roda as migrations antes de cada deploy em produção.
+
+As rotinas agendadas (lembretes, fila de notificações) rodam pelo **GitHub
+Actions** (`schedule`), chamando `/internal/*` com `CRON_SECRET`, e não pelo
+cron da Vercel.
+
+## Scripts
+
+`npm test` · `npm run lint:check` · `npm run typecheck` · `npm run build` · `npm run schema:generate` · `npm run migration:create`
