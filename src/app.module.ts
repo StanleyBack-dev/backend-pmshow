@@ -9,6 +9,7 @@ import { buildGraphqlConfig } from "@/common/graphql/graphql.config";
 import { InternalApiKeyGuard } from "@/common/security/internal-api-key.guard";
 import { AppConfigModule } from "@/config/config.module";
 import { DatabaseModule } from "@/database/database.module";
+import { EventsModule } from "@/modules/events/events.module";
 import { AccessControlModule } from "@/modules/access-control/access-control.module";
 import { PermissionsGuard } from "@/modules/access-control/presentation/guards/permissions.guard";
 import { AuditModule } from "@/modules/audit/audit.module";
@@ -35,6 +36,7 @@ import { SharedModule } from "@/shared/shared.module";
     MembersModule,
     RepertoireModule,
     MediaModule,
+    EventsModule,
   ],
   providers: [
     AppResolver,

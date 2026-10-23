@@ -69,6 +69,11 @@ export class SongsUseCase {
     return song;
   }
 
+  /** The songs that exist, in no particular order (archived included). */
+  findMany(ids: readonly string[]): Promise<Song[]> {
+    return this.songs.findByIds(ids);
+  }
+
   async create(actor: AuthenticatedUser, input: SongInput): Promise<Song> {
     const song = await this.songs.create(this.toData(input), actor.id);
     await this.record(actor, "song.created", song.id, { title: song.title });
