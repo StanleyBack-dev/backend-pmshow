@@ -25,11 +25,15 @@
     "test:cov": "jest --coverage",
     "prepr": "npm run lint:check && npm run typecheck && npm run build && npm run test && npm run schema:check",
     "schema:generate": "ts-node -r tsconfig-paths/register scripts/generate-schema.ts",
-    "schema:check": "npm run schema:generate && git diff --exit-code -- src/graphql/schema.gql"
+    "schema:check": "npm run schema:generate && git diff --exit-code -- src/graphql/schema.gql",
+    "storage:cors": "ts-node scripts/configure-storage-cors.ts"
   },
   "dependencies": {
     "@apollo/server": "^5.2.0",
     "@as-integrations/express5": "^1.1.2",
+    "@aws-sdk/client-s3": "^3.1156.0",
+    "@aws-sdk/s3-presigned-post": "^3.1156.0",
+    "@aws-sdk/s3-request-presigner": "^3.1156.0",
     "@nestjs/apollo": "^13.2.3",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
