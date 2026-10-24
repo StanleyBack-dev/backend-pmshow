@@ -143,6 +143,13 @@ export class NotificationsUseCase implements OnModuleInit {
     return true;
   }
 
+  /** Read notifications older than a year go (daily maintenance). */
+  purgeOldRead(now: Date): Promise<number> {
+    return this.notifications.purgeReadBefore(
+      new Date(now.getTime() - 365 * 86_400_000),
+    );
+  }
+
   markAllRead(userId: string): Promise<number> {
     return this.notifications.markAllRead(userId, this.clock.now());
   }

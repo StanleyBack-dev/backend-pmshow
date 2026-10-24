@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import type { GqlContextType } from "@nestjs/graphql";
 import type { Response } from "express";
+import { redact } from "@/common/logging/redact";
 
 interface ErrorBody {
   statusCode: number;
@@ -38,9 +39,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (!(exception instanceof HttpException)) {
       const reason =
         exception instanceof Error ? exception.stack : String(exception);
-      this.logger.error(`${body.code}: ${reason}`);
+      this.logger.error(redact(`${body.code}: ${reason}`));
     } else if (body.statusCode >= 500) {
-      this.logger.warn(`${body.code}: ${body.message}`);
+      this.logger.warn(redact(`${body.code}: ${body.message}`));
     }
 
     response.status(body.statusCode).json(body);

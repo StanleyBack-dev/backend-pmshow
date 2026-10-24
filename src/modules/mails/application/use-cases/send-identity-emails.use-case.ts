@@ -11,6 +11,7 @@ import {
   renderRecoveryCodeEmail,
   type RenderedEmail,
 } from "@/modules/mails/application/templates/identity/identity-emails.template";
+import { redact } from "@/common/logging/redact";
 
 export type IdentityEmailRecipient = {
   name: string;
@@ -87,7 +88,7 @@ export class SendIdentityEmailsUseCase {
       });
       return true;
     } catch (error) {
-      this.logger.warn(`E-mail ${tag} não enviado: ${String(error)}`);
+      this.logger.warn(`E-mail ${tag} não enviado: ${redact(String(error))}`);
       return false;
     }
   }

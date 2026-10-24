@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { IsNull, type Repository } from "typeorm";
+import { IsNull, LessThan, type Repository } from "typeorm";
 import type {
   NewNotification,
   NotificationRepositoryPort,
@@ -81,6 +81,13 @@ export class NotificationTypeormRepository implements NotificationRepositoryPort
       { userId, readAt: IsNull() },
       { readAt: at },
     );
+    return result.affected ?? 0;
+  }
+
+  async purgeReadBefore(before: Date): Promise<number> {
+    const result = await this.notifications.delete({
+      readAt: LessThan(before),
+    });
     return result.affected ?? 0;
   }
 

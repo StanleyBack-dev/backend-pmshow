@@ -4,6 +4,7 @@ import type {
   MailProviderPort,
   SendMailCommand,
 } from "@/modules/mails/application/ports/mail-provider.port";
+import { maskEmail } from "@/common/logging/redact";
 
 // MAIL_DRIVER=log: used until the Brevo account exists (and in tests/dev).
 // Logs who would receive what. The body may carry a temporary password or a
@@ -20,7 +21,7 @@ export class LogMailProvider implements MailProviderPort {
 
   send(command: SendMailCommand): Promise<void> {
     this.logger.log(
-      `[e-mail não enviado: MAIL_DRIVER=log] para=${command.to.email} assunto="${command.subject}" tags=${(command.tags ?? []).join(",")} anexos=${(command.attachments ?? []).map((file) => file.name).join(",") || "-"}`,
+      `[e-mail não enviado: MAIL_DRIVER=log] para=${maskEmail(command.to.email)} assunto="${command.subject}" tags=${(command.tags ?? []).join(",")} anexos=${(command.attachments ?? []).map((file) => file.name).join(",") || "-"}`,
     );
     if (this.showBody && command.text) {
       this.logger.log(`[corpo — só em development]\n${command.text}`);

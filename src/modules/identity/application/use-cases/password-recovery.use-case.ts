@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { APP_ERRORS } from "@/common/exceptions/app-errors.catalog";
 import { AppException } from "@/common/exceptions/app-exception";
 import { AuditTrailService } from "@/modules/audit/application/audit-trail.service";
+import { AuthThrottleService } from "@/modules/identity/application/auth-throttle.service";
 import { IdentityConfig } from "@/modules/identity/application/identity.config";
 import { PasswordService } from "@/modules/identity/application/password.service";
 import {
@@ -47,9 +48,11 @@ export class PasswordRecoveryUseCase {
     private readonly passwords: PasswordService,
     private readonly audit: AuditTrailService,
     private readonly config: IdentityConfig,
+    private readonly throttle: AuthThrottleService,
   ) {}
 
-  async request(login: string): Promise<void> {
+  async request(login: string, ip: string | null): Promise<void> {
+    await this.throttle.consume("recovery-request", ip);
     const user = await this.findActive(login);
     if (!user) return;
 
@@ -77,7 +80,12 @@ export class PasswordRecoveryUseCase {
   }
 
   /** Returns the reset token that authorizes the final step. */
-  async verify(login: string, code: string): Promise<string> {
+  async verify(
+    login: string,
+    code: string,
+    ip: string | null,
+  ): Promise<string> {
+    await this.throttle.consume("recovery-verify", ip);
     const invalid = () =>
       AppException.from(APP_ERRORS.identity.recoveryInvalidCode, undefined);
 

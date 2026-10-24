@@ -22,6 +22,8 @@ export interface SessionRepositoryPort {
   /** Slides the expiry and records the use. */
   touch(id: string, expiresAt: Date, usedAt: Date): Promise<void>;
   revoke(id: string, at: Date): Promise<void>;
+  /** Deletes sessions that expired or were revoked before `before`. */
+  purgeEndedBefore(before: Date): Promise<number>;
   revokeAllForUser(
     userId: string,
     at: Date,

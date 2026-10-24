@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { APP_ERRORS } from "@/common/exceptions/app-errors.catalog";
 import { AppException } from "@/common/exceptions/app-exception";
+import { AuthThrottleService } from "@/modules/identity/application/auth-throttle.service";
 import { IdentityConfig } from "@/modules/identity/application/identity.config";
 import {
   CREDENTIAL_REPOSITORY,
@@ -56,12 +57,14 @@ export class LoginUseCase {
     @Inject(CLOCK) private readonly clock: ClockPort,
     private readonly sessionTokens: SessionTokensService,
     private readonly config: IdentityConfig,
+    private readonly throttle: AuthThrottleService,
   ) {}
 
   async execute(
     input: { login: string; password: string },
     meta: RequestMeta,
   ): Promise<LoginResult> {
+    await this.throttle.assertCanTryLogin(meta.ipAddress);
     const login = isEmailLogin(input.login)
       ? normalizeEmail(input.login)
       : normalizeUsername(input.login);
@@ -72,6 +75,7 @@ export class LoginUseCase {
 
     if (!user || !credential) {
       await this.hasher.verify(input.password, await this.getDecoyHash());
+      await this.throttle.failedLogin(meta.ipAddress);
       throw AppException.from(
         APP_ERRORS.identity.invalidCredentials,
         undefined,
@@ -84,6 +88,7 @@ export class LoginUseCase {
     }
 
     if (!(await this.hasher.verify(input.password, credential.passwordHash))) {
+      await this.throttle.failedLogin(meta.ipAddress);
       const next = afterFailedLogin(credential, now, this.config.lockout);
       await this.credentials.update(user.id, next);
       if (next.lockedUntil) throw this.lockedError(next.lockedUntil, now);

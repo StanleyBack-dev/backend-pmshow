@@ -7,6 +7,7 @@ import {
   type AuditLogRepositoryPort,
 } from "@/modules/audit/application/ports/audit-log-repository.port";
 import type { PageRequest, Paginated } from "@/shared/application/pagination";
+import { redact } from "@/common/logging/redact";
 
 // Public API of the audit module. Recording runs after the audited change
 // succeeded: a failure to write the trail is logged loudly but never undoes
@@ -25,7 +26,7 @@ export class AuditTrailService {
       await this.repository.append(entry);
     } catch (error) {
       this.logger.error(
-        `Falha ao registrar auditoria ${entry.action} (${entry.entity}:${entry.entityId ?? "-"}): ${String(error)}`,
+        `Falha ao registrar auditoria ${entry.action} (${entry.entity}:${entry.entityId ?? "-"}): ${redact(String(error))}`,
       );
     }
   }

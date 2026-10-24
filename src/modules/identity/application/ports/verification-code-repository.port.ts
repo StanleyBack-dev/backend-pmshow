@@ -28,6 +28,8 @@ export interface VerificationCodeRepositoryPort {
     purpose: VerificationPurpose,
   ): Promise<VerificationCode | null>;
   findByResetTokenHash(hash: string): Promise<VerificationCode | null>;
+  /** Deletes codes (and their reset tokens) expired before `before`. */
+  purgeExpiredBefore(before: Date): Promise<number>;
   countCreatedSince(
     userId: string,
     purpose: VerificationPurpose,

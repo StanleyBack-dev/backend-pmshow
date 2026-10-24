@@ -1,9 +1,11 @@
 import type { ApolloDriverConfig } from "@nestjs/apollo";
 import { ApolloDriver } from "@nestjs/apollo";
 import { formatGraphqlError } from "@/common/exceptions/graphql-error.formatter";
+import { aliasLimitRule } from "@/common/graphql/alias-limit.rule";
 import { depthLimitRule } from "@/common/graphql/depth-limit.rule";
 
 const MAX_QUERY_DEPTH = 8;
+const MAX_ALIASES = 20;
 
 // Code-first schema (vaulto pattern), built in memory at boot. The SDL file
 // the frontend codegen reads (src/graphql/schema.gql) comes only from
@@ -21,6 +23,9 @@ export function buildGraphqlConfig(): ApolloDriverConfig {
     introspection: !isProduction,
     context: ({ req, res }: { req: unknown; res: unknown }) => ({ req, res }),
     formatError: formatGraphqlError,
-    validationRules: [depthLimitRule(MAX_QUERY_DEPTH)],
+    validationRules: [
+      depthLimitRule(MAX_QUERY_DEPTH),
+      aliasLimitRule(MAX_ALIASES),
+    ],
   };
 }
