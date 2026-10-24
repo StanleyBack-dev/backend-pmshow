@@ -33,6 +33,43 @@ type AuditEntryPage {
   totalPages: Int!
 }
 
+"""Período em que alguém não pode ser escalado."""
+type Absence {
+  id: ID!
+  userId: ID!
+  userName: String!
+  warName: String
+  type: AbsenceType!
+
+  """AAAA-MM-DD (inclusive)."""
+  startsOn: String!
+
+  """AAAA-MM-DD (inclusive)."""
+  endsOn: String!
+  reason: String
+  status: AbsenceStatus!
+  reviewNote: String
+  reviewedAt: DateTime
+  createdAt: DateTime!
+}
+
+"""Motivo da indisponibilidade."""
+enum AbsenceType {
+  FERIAS
+  LICENCA
+  DISPENSA_MEDICA
+  MISSAO
+  CURSO
+  OUTRO
+}
+
+enum AbsenceStatus {
+  PENDENTE
+  APROVADA
+  RECUSADA
+  CANCELADA
+}
+
 """Local de apresentação."""
 type Venue {
   id: ID!
@@ -396,12 +433,175 @@ type RosterPage {
   totalPages: Int!
 }
 
+type Notification {
+  id: ID!
+  type: NotificationType!
+  title: String!
+  body: String!
+
+  """Caminho no app."""
+  link: String
+  readAt: DateTime
+  createdAt: DateTime!
+}
+
+enum NotificationType {
+  ROSTER_PUBLISHED
+  ROSTER_UPDATED
+  ROSTER_REMOVED
+  EVENT_RESCHEDULED
+  EVENT_CANCELLED
+  ROSTER_SWAP_REQUESTED
+  ABSENCE_REVIEWED
+}
+
+type NotificationPage {
+  items: [Notification!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+type NotificationPreference {
+  type: NotificationType!
+
+  """Também recebe por e-mail."""
+  emailEnabled: Boolean!
+}
+
+"""Uma pessoa na escala."""
+type Assignment {
+  userId: ID!
+  role: AssignmentRole!
+  instrumentId: ID
+  notes: String
+
+  """Justificativa por manter alguém com outro evento no horário."""
+  overrideReason: String
+  ackStatus: AckStatus!
+  ackNote: String
+  ackAt: DateTime
+
+  """null se a conta foi desativada."""
+  person: RosterPerson
+  instrumentName: String
+}
+
+"""Função na escala."""
+enum AssignmentRole {
+  MUSICO
+  REGENTE
+  CHEFE_EQUIPE
+  MOTORISTA
+  SOM
+  APOIO
+}
+
+"""Resposta do escalado."""
+enum AckStatus {
+  PENDENTE
+  CIENTE
+  TROCA_SOLICITADA
+}
+
+"""Escala de um evento."""
+type Roster {
+  eventId: ID!
+  status: RosterStatus!
+  version: Int!
+  publishedAt: DateTime
+  assignments: [Assignment!]!
+
+  """Naipes com músicos ativos e ninguém escalado."""
+  uncoveredSections: [Section!]!
+}
+
+enum RosterStatus {
+  RASCUNHO
+  PUBLICADA
+}
+
+"""Minha participação numa escala publicada."""
+type MyAssignment {
+  userId: ID!
+  role: AssignmentRole!
+  instrumentId: ID
+  notes: String
+
+  """Justificativa por manter alguém com outro evento no horário."""
+  overrideReason: String
+  ackStatus: AckStatus!
+  ackNote: String
+  ackAt: DateTime
+
+  """null se a conta foi desativada."""
+  person: RosterPerson
+  instrumentName: String
+  eventId: ID!
+  event: Event
+}
+
+type BusyWith {
+  eventId: ID!
+  title: String!
+}
+
+type CandidateAbsence {
+  type: AbsenceType!
+  startsOn: String!
+  endsOn: String!
+}
+
+"""Integrante que pode (ou não) ir ao evento."""
+type RosterCandidate {
+  userId: ID!
+  name: String!
+  warName: String!
+  rank: Rank!
+  section: Section!
+  memberStatus: MemberStatus!
+  instruments: [MemberInstrument!]!
+  blocker: CandidateBlocker
+  absence: CandidateAbsence
+
+  """Outros eventos no mesmo horário (alerta, não bloqueia)."""
+  busyWith: [BusyWith!]!
+}
+
+"""Por que a pessoa não pode ser escalada."""
+enum CandidateBlocker {
+  """Sem cadastro ativo na banda."""
+  NO_PROFILE
+
+  """Inativo."""
+  INACTIVE
+
+  """Afastado."""
+  AWAY
+
+  """Indisponibilidade aprovada no período."""
+  ABSENT
+}
+
+"""Quem está na linha da escala."""
+type RosterPerson {
+  name: String!
+  warName: String!
+  rank: Rank!
+  section: Section!
+}
+
 type Query {
   """Verifica se a API GraphQL responde."""
   ping: String!
 
   """Trilha de auditoria, da mais recente para a mais antiga."""
   auditLogs(filter: AuditFilterInput, page: PageInput): AuditEntryPage!
+  myAbsences: [Absence!]!
+
+  """Até 500, das mais recentes."""
+  absences(filter: AbsenceFilterInput): [Absence!]!
 
   """Eventos por período (ordenados pelo início, até 500)."""
   events(filter: EventFilterInput): [Event!]!
@@ -428,11 +628,27 @@ type Query {
   """O cadastro do próprio usuário na banda."""
   myMemberProfile: MemberProfile
   instruments(includeArchived: Boolean! = false): [Instrument!]!
+
+  """Mais recentes primeiro."""
+  myNotifications(unreadOnly: Boolean! = false, page: PageInput): NotificationPage!
+  unreadNotificationsCount: Int!
+  myNotificationPreferences: [NotificationPreference!]!
   songs(filter: SongFilterInput, page: PageInput): SongPage!
   song(id: ID!): Song!
 
   """Tags em uso no repertório."""
   songTags: [String!]!
+
+  """
+  Escala do evento. Rascunhos só para quem vê todas; publicada para quem está nela.
+  """
+  eventRoster(eventId: ID!): Roster
+
+  """Integrantes com o que bloqueia ou alerta para este evento."""
+  rosterCandidates(eventId: ID!): [RosterCandidate!]!
+
+  """Minhas escalas publicadas, dos próximos eventos."""
+  myAssignments: [MyAssignment!]!
 }
 
 input AuditFilterInput {
@@ -444,6 +660,17 @@ input AuditFilterInput {
 input PageInput {
   page: Int! = 1
   limit: Int! = 20
+}
+
+input AbsenceFilterInput {
+  userId: ID
+  statuses: [AbsenceStatus!]
+
+  """Tocando o período a partir de (AAAA-MM-DD)."""
+  from: String
+
+  """Tocando o período até (AAAA-MM-DD)."""
+  to: String
 }
 
 input EventFilterInput {
@@ -482,6 +709,13 @@ input SongFilterInput {
 }
 
 type Mutation {
+  """Pede para si (pendente)."""
+  requestAbsence(input: AbsenceInput!): Absence!
+
+  """Lança para alguém, já aprovada."""
+  registerAbsence(userId: ID!, input: AbsenceInput!): Absence!
+  reviewAbsence(id: ID!, approve: Boolean!, note: String): Absence!
+  cancelAbsence(id: ID!): Absence!
   createEvent(input: EventInput!): Event!
   updateEvent(id: ID!, input: EventInput!): Event!
 
@@ -545,11 +779,38 @@ type Mutation {
   saveMemberProfile(userId: ID!, input: MemberProfileInput!): MemberProfile!
   createInstrument(input: CreateInstrumentInput!): Instrument!
   updateInstrument(id: ID!, input: UpdateInstrumentInput!): Instrument!
+  markNotificationRead(id: ID!): Boolean!
+
+  """Quantas foram marcadas."""
+  markAllNotificationsRead: Int!
+  setNotificationPreference(type: NotificationType!, emailEnabled: Boolean!): NotificationPreference!
   createSong(input: SongInput!): Song!
   updateSong(id: ID!, input: SongInput!): Song!
 
   """Arquiva (some das listas) ou restaura a música."""
   setSongArchived(id: ID!, archived: Boolean!): Song!
+
+  """
+  Substitui a lista da escala. Publicada: notifica só quem entrou, saiu ou mudou de função.
+  """
+  saveRoster(eventId: ID!, input: RosterInput!): Roster!
+
+  """Publica e notifica todos."""
+  publishRoster(eventId: ID!): Roster!
+
+  """Ciente, ou pedido de troca (com motivo)."""
+  acknowledgeRoster(eventId: ID!, answer: AckAnswer!, note: String): Assignment!
+}
+
+input AbsenceInput {
+  type: AbsenceType!
+
+  """AAAA-MM-DD"""
+  startsOn: String!
+
+  """AAAA-MM-DD"""
+  endsOn: String!
+  reason: String
 }
 
 input EventInput {
@@ -701,4 +962,21 @@ input SongInput {
   lyrics: String
   notes: String
   tags: [String!]! = []
+}
+
+input RosterInput {
+  assignments: [AssignmentInput!]!
+}
+
+input AssignmentInput {
+  userId: ID!
+  role: AssignmentRole!
+  instrumentId: ID
+  notes: String
+  overrideReason: String
+}
+
+enum AckAnswer {
+  CIENTE
+  TROCA_SOLICITADA
 }

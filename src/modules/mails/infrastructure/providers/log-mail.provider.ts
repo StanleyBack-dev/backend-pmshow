@@ -20,7 +20,7 @@ export class LogMailProvider implements MailProviderPort {
 
   send(command: SendMailCommand): Promise<void> {
     this.logger.log(
-      `[e-mail não enviado: MAIL_DRIVER=log] para=${command.to.email} assunto="${command.subject}" tags=${(command.tags ?? []).join(",")}`,
+      `[e-mail não enviado: MAIL_DRIVER=log] para=${command.to.email} assunto="${command.subject}" tags=${(command.tags ?? []).join(",")} anexos=${(command.attachments ?? []).map((file) => file.name).join(",") || "-"}`,
     );
     if (this.showBody && command.text) {
       this.logger.log(`[corpo — só em development]\n${command.text}`);

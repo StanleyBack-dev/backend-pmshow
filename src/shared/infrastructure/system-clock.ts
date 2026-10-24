@@ -9,7 +9,7 @@ import {
 
 @Injectable()
 export class SystemClock implements ClockPort {
-  private readonly timeZone: string;
+  readonly timeZone: string;
 
   constructor(config: ConfigService) {
     this.timeZone = config.get<string>("APP_TIMEZONE") ?? "America/Sao_Paulo";

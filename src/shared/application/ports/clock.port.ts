@@ -1,4 +1,6 @@
 export interface ClockPort {
+  /** IANA name of the app timezone (America/Sao_Paulo). */
+  readonly timeZone: string;
   now(): Date;
   /** Suspends execution (abstracted so retries are testable). */
   sleep(ms: number): Promise<void>;

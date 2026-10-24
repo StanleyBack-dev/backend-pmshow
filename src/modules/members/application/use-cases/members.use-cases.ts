@@ -66,6 +66,15 @@ export class MembersUseCase {
     return this.members.listRoster(filter, page);
   }
 
+  /** Everyone with a band profile and an enabled account (for rosters). */
+  async bandMembers(): Promise<RosterEntry[]> {
+    const page = await this.members.listRoster(
+      { withProfile: true },
+      { page: 1, limit: 1000 },
+    );
+    return page.items.filter((entry) => entry.active && entry.profile);
+  }
+
   async profileOf(userId: string): Promise<MemberProfile | null> {
     return this.members.findProfile(userId);
   }
