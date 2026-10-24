@@ -7,6 +7,12 @@ export const identityErrors = {
     status: HttpStatus.UNAUTHORIZED,
     message: "Usuário ou senha inválidos.",
   },
+  tooManyRequests: {
+    code: "AUTH_TOO_MANY_REQUESTS",
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    message: (params: { minutes: number }) =>
+      `Muitas tentativas a partir desta conexão. Tente novamente em ${params.minutes} minuto(s).`,
+  },
   accountLocked: {
     code: "AUTH_ACCOUNT_LOCKED",
     status: HttpStatus.LOCKED,

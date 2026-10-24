@@ -20,6 +20,7 @@ import { IdentityModule } from "@/modules/identity/identity.module";
 import { FirstAccessGuard } from "@/modules/identity/presentation/guards/first-access.guard";
 import { UserSessionGuard } from "@/modules/identity/presentation/guards/user-session.guard";
 import { MailModule } from "@/modules/mails/mail.module";
+import { MaintenanceModule } from "@/modules/maintenance/maintenance.module";
 import { MediaModule } from "@/modules/media/media.module";
 import { MembersModule } from "@/modules/members/members.module";
 import { NotificationsModule } from "@/modules/notifications/notifications.module";
@@ -49,6 +50,7 @@ import { SharedModule } from "@/shared/shared.module";
     RostersModule,
     BroadcastsModule,
     DashboardModule,
+    MaintenanceModule,
   ],
   providers: [
     AppResolver,

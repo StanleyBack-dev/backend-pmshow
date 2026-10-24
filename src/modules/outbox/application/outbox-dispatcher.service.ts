@@ -10,6 +10,7 @@ import {
   type OutboxMessage,
 } from "@/modules/outbox/domain/outbox";
 import { CLOCK, type ClockPort } from "@/shared/application/ports/clock.port";
+import { redact } from "@/common/logging/redact";
 
 const BATCH = 50;
 /** A claimed message is retried by others if not settled within this. */
@@ -34,13 +35,20 @@ export class OutboxDispatcher {
     return this.outbox.enqueue(drafts);
   }
 
+  /** Delivered messages are kept a while for troubleshooting, then go. */
+  purgeDelivered(before: Date): Promise<number> {
+    return this.outbox.purgeDeliveredBefore(before);
+  }
+
   /**
    * Best-effort delivery right after a commit. Whatever does not go out now
    * is picked up by the scheduled run (POST /internal/outbox/process).
    */
   kick(): void {
     void this.process().catch((error: unknown) =>
-      this.logger.error(`Falha ao processar a outbox: ${String(error)}`),
+      this.logger.error(
+        `Falha ao processar a outbox: ${redact(String(error))}`,
+      ),
     );
   }
 
@@ -93,7 +101,8 @@ export class OutboxDispatcher {
       await this.outbox.markDone(message.id, this.clock.now());
       return true;
     } catch (error) {
-      const reason = String(error).slice(0, 1000);
+      // Stored in tb_outbox.last_error and logged: no personal data.
+      const reason = redact(String(error)).slice(0, 1000);
       const plan = nextAttempt(message.attempts, this.clock.now());
       if (plan === "give-up") {
         await this.outbox.markFailed(message.id, reason);

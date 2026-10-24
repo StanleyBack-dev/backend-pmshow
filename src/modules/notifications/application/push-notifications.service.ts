@@ -10,6 +10,7 @@ import {
   type PushSubscriptionRepositoryPort,
 } from "@/modules/notifications/application/ports/push.ports";
 import { CLOCK, type ClockPort } from "@/shared/application/ports/clock.port";
+import { redact } from "@/common/logging/redact";
 
 const MAX_DEVICES_PER_USER = 10;
 
@@ -71,7 +72,7 @@ export class PushNotificationsService {
           await this.subscriptions.touch(device.endpoint, this.clock.now());
           return true;
         } catch (error) {
-          this.logger.warn(`Push não entregue: ${String(error)}`);
+          this.logger.warn(`Push não entregue: ${redact(String(error))}`);
           return false;
         }
       }),

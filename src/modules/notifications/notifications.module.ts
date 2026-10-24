@@ -48,5 +48,6 @@ import { OutboxModule } from "@/modules/outbox/outbox.module";
       useClass: NotificationTypeormRepository,
     },
   ],
+  exports: [NotificationsUseCase],
 })
 export class NotificationsModule {}

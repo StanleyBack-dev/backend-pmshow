@@ -14,6 +14,8 @@ export interface OutboxRepositoryPort {
   markDone(id: string, at: Date): Promise<void>;
   markRetry(id: string, retryAt: Date, error: string): Promise<void>;
   markFailed(id: string, error: string): Promise<void>;
+  /** Deletes delivered messages processed before `before`. */
+  purgeDeliveredBefore(before: Date): Promise<number>;
 }
 
 export const OUTBOX_REPOSITORY = Symbol("OUTBOX_REPOSITORY");

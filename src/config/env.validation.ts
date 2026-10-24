@@ -68,6 +68,11 @@ export const envValidationSchema = Joi.object({
   AWS_S3_BUCKET: Joi.string().allow("").optional(),
   AWS_ACCESS_KEY_ID: Joi.string().allow("").optional(),
   AWS_SECRET_ACCESS_KEY: Joi.string().allow("").optional(),
+  // === PER-IP LIMITS on login / password recovery ===
+  AUTH_IP_LOGIN_FAILURES: Joi.number().integer().min(1).default(20),
+  AUTH_IP_RECOVERY_REQUESTS: Joi.number().integer().min(1).default(10),
+  AUTH_IP_RECOVERY_VERIFY: Joi.number().integer().min(1).default(20),
+
   MEDIA_MAX_AUDIO_MB: Joi.number().integer().min(1).max(200).default(50),
 
   // === WEB PUSH (VAPID; generate with `npm run push:vapid`) ===

@@ -113,6 +113,18 @@ export class OutboxTypeormRepository implements OutboxRepositoryPort {
     });
   }
 
+  async purgeDeliveredBefore(before: Date): Promise<number> {
+    const result = await this.repository()
+      .createQueryBuilder()
+      .delete()
+      .where("status = :done AND processed_at < :before", {
+        done: OutboxStatus.DONE,
+        before,
+      })
+      .execute();
+    return result.affected ?? 0;
+  }
+
   private repository() {
     return this.dataSource.getRepository(OutboxMessageOrmEntity);
   }

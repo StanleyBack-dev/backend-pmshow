@@ -86,4 +86,17 @@ export class VerificationCodeTypeormRepository implements VerificationCodeReposi
   ): Promise<void> {
     await this.repository.update({ id }, patch);
   }
+
+  async purgeExpiredBefore(before: Date): Promise<number> {
+    const result = await this.repository
+      .createQueryBuilder()
+      .delete()
+      .where("expires_at < :before", { before })
+      .andWhere(
+        "(reset_token_expires_at IS NULL OR reset_token_expires_at < :before)",
+        { before },
+      )
+      .execute();
+    return result.affected ?? 0;
+  }
 }

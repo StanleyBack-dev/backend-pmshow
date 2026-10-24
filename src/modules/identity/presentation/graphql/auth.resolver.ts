@@ -119,8 +119,9 @@ export class AuthResolver {
   })
   async requestPasswordRecovery(
     @Args("login") login: string,
+    @CurrentRequestMeta() meta: RequestMeta,
   ): Promise<boolean> {
-    await this.recovery.request(login.slice(0, 254));
+    await this.recovery.request(login.slice(0, 254), meta.ipAddress);
     return true;
   }
 
@@ -130,8 +131,9 @@ export class AuthResolver {
   })
   verifyPasswordRecoveryCode(
     @Args("input") input: VerifyRecoveryCodeInput,
+    @CurrentRequestMeta() meta: RequestMeta,
   ): Promise<string> {
-    return this.recovery.verify(input.login, input.code);
+    return this.recovery.verify(input.login, input.code, meta.ipAddress);
   }
 
   @Public()

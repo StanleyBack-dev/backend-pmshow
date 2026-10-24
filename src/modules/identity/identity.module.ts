@@ -2,7 +2,9 @@ import { Module, type OnApplicationBootstrap } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AccessControlModule } from "@/modules/access-control/access-control.module";
 import { AuditModule } from "@/modules/audit/audit.module";
+import { AuthThrottleService } from "@/modules/identity/application/auth-throttle.service";
 import { IdentityConfig } from "@/modules/identity/application/identity.config";
+import { IdentityMaintenanceService } from "@/modules/identity/application/identity-maintenance.service";
 import { PasswordService } from "@/modules/identity/application/password.service";
 import { ACCESS_TOKEN } from "@/modules/identity/application/ports/access-token.port";
 import { CREDENTIAL_REPOSITORY } from "@/modules/identity/application/ports/credential-repository.port";
@@ -70,6 +72,8 @@ import { MailModule } from "@/modules/mails/mail.module";
   ],
   providers: [
     IdentityConfig,
+    AuthThrottleService,
+    IdentityMaintenanceService,
     PasswordService,
     SessionTokensService,
     UserManagementPolicy,
@@ -106,7 +110,12 @@ import { MailModule } from "@/modules/mails/mail.module";
     UserSessionGuard,
     FirstAccessGuard,
   ],
-  exports: [UserSessionGuard, FirstAccessGuard, UserLookupService],
+  exports: [
+    UserSessionGuard,
+    FirstAccessGuard,
+    UserLookupService,
+    IdentityMaintenanceService,
+  ],
 })
 export class IdentityModule implements OnApplicationBootstrap {
   constructor(private readonly bootstrapAdmin: BootstrapAdminMasterUseCase) {}

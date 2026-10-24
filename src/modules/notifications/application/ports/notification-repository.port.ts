@@ -18,6 +18,8 @@ export interface NotificationRepositoryPort {
   /** false when the notification is not the user's. */
   markRead(userId: string, id: string, at: Date): Promise<boolean>;
   markAllRead(userId: string, at: Date): Promise<number>;
+  /** Deletes notifications read before `before`. */
+  purgeReadBefore(before: Date): Promise<number>;
   emailOverrides(userId: string): Promise<Map<NotificationType, boolean>>;
   /** `enabled = null` drops the override (back to the default). */
   setEmailOverride(

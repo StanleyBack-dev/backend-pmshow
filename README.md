@@ -12,7 +12,7 @@ DDD modular com Ports & Adapters. Cada módulo tem suas próprias camadas:
 src/modules/<módulo>/
 ├── domain/                regras puras (sem Nest, TypeORM, GraphQL) — o lint bloqueia esses imports
 ├── application/           casos de uso + ports (interfaces) — só depende de ports
-├── infrastructure/        adapters (TypeORM, R2, Brevo, oEmbed)
+├── infrastructure/        adapters (TypeORM, Neon Object Storage, Brevo, Web Push, oEmbed)
 └── presentation/graphql/  resolvers + DTOs (@ObjectType / @InputType)
 ```
 
@@ -23,8 +23,11 @@ src/modules/<módulo>/
   conhece essa chave.
 - Os erros chegam como `{ message, extensions: { code, statusCode, details } }`
   (`AppException` + catálogos em `src/common/exceptions/catalogs`).
-- Proteções do GraphQL: introspecção desligada em produção, sem playground e
-  com limite de profundidade das queries (`depthLimitRule`).
+- Proteções do GraphQL: introspecção desligada em produção, sem playground,
+  limite de profundidade (`depthLimitRule`) e de aliases (`aliasLimitRule`).
+- Login e recuperação de senha têm limite por IP (`AuthThrottleService`), além
+  do bloqueio por conta. O IP é guardado só como HMAC.
+- Os logs passam por `redact()`, que mascara e-mails, telefones e tokens (LGPD).
 
 ### Módulos
 
@@ -34,6 +37,17 @@ src/modules/<módulo>/
 | `access-control` | Grupos (`USER`, `ADMIN`, `ADMIN_MASTER`), permissões padrão por grupo, exceções por usuário, `PermissionsGuard` + `@RequirePermissions`                              |
 | `audit`          | Trilha de auditoria das ações administrativas (a leitura exige `AUDIT_READ`)                                                                                         |
 | `mails`          | Provider (log ou Brevo) + templates                                                                                                                                  |
+| `members`        | Perfil na banda: nome de guerra, posto/graduação, naipe, situação e instrumentos                                                                                     |
+| `repertoire`     | Músicas, categorias, tonalidade, tags e busca sem acento                                                                                                             |
+| `media`          | Áudios (Neon Object Storage, URLs assinadas) e vídeos do YouTube                                                                                                     |
+| `events`         | Agenda: eventos, locais e setlist por evento                                                                                                                         |
+| `availability`   | Indisponibilidades (férias, licença, missão…) com aprovação                                                                                                          |
+| `rosters`        | Escalas: regras de conflito, publicação, ciência, avisos e lembretes                                                                                                 |
+| `outbox`         | Fila transacional entre módulos, com novas tentativas                                                                                                                |
+| `notifications`  | Caixa de entrada, e-mail (com `.ics`) e Web Push, com preferências por pessoa                                                                                         |
+| `broadcasts`     | Comunicados para a banda, um naipe ou os escalados de um evento                                                                                                      |
+| `dashboard`      | Painel do gestor (contagens só de leitura)                                                                                                                           |
+| `maintenance`    | Limpeza diária de dados vencidos (sessões, códigos, fila, notificações lidas)                                                                                        |
 
 Guards globais, nesta ordem: chave interna do BFF → sessão → primeiro acesso
 (senha temporária) → permissões. As permissões são lidas a cada requisição, então
@@ -74,10 +88,13 @@ npm run start:dev                 # http://localhost:4000/graphql
 2. Importe este repositório na Vercel e configure as variáveis do `.env.example` com `NODE_ENV=production`.
 3. O workflow `deploy-backend.yml` roda as migrations antes de cada deploy em produção.
 
-As rotinas agendadas (lembretes, fila de notificações) rodam pelo **GitHub
-Actions** (`schedule`), chamando `/internal/*` com `CRON_SECRET`, e não pelo
-cron da Vercel.
+As rotinas agendadas (`.github/workflows/routines.yml`) rodam pelo **GitHub
+Actions**, chamando `/internal/*` com `CRON_SECRET`, e não pelo cron da Vercel.
+Elas precisam dos secrets `API_URL` e `CRON_SECRET` no repositório.
+
+Backup, restauração e o dia a dia da operação estão em
+[`docs/OPERACAO.md`](docs/OPERACAO.md).
 
 ## Scripts
 
-`npm test` · `npm run lint:check` · `npm run typecheck` · `npm run build` · `npm run schema:generate` · `npm run migration:create`
+`npm test` · `npm run lint:check` · `npm run typecheck` · `npm run build` · `npm run schema:generate` · `npm run migration:create` · `npm run storage:cors` · `npm run push:vapid`

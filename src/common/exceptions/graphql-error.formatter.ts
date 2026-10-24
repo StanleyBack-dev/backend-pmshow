@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus, Logger } from "@nestjs/common";
 import { GraphQLError, type GraphQLFormattedError } from "graphql";
+import { redact } from "@/common/logging/redact";
 
 const logger = new Logger("GraphQL");
 
@@ -28,7 +29,9 @@ export function formatGraphqlError(
       !body.code && statusCode === (HttpStatus.BAD_REQUEST as number);
 
     if (statusCode >= 500) {
-      logger.warn(`${body.code ?? "HTTP_EXCEPTION"}: ${String(body.message)}`);
+      logger.warn(
+        redact(`${body.code ?? "HTTP_EXCEPTION"}: ${String(body.message)}`),
+      );
     }
 
     return {
@@ -65,7 +68,7 @@ export function formatGraphqlError(
     };
   }
 
-  logger.error(originalError.stack ?? String(originalError));
+  logger.error(redact(originalError.stack ?? String(originalError)));
   return {
     message: "Erro interno inesperado.",
     path: formattedError.path,

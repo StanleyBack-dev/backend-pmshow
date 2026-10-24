@@ -60,4 +60,13 @@ export class SessionTypeormRepository implements SessionRepositoryPort {
       { revokedAt: at },
     );
   }
+
+  async purgeEndedBefore(before: Date): Promise<number> {
+    const result = await this.repository
+      .createQueryBuilder()
+      .delete()
+      .where("expires_at < :before OR revoked_at < :before", { before })
+      .execute();
+    return result.affected ?? 0;
+  }
 }
