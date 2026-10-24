@@ -1,12 +1,17 @@
 import { ParseUUIDPipe } from "@nestjs/common";
 import { Args, ID, Int, Mutation, Query, Resolver } from "@nestjs/graphql";
 import type { AuthenticatedUser } from "@/common/auth/authenticated-user";
+import {
+  CurrentRequestMeta,
+  type RequestMeta,
+} from "@/common/decorators/request-meta.decorator";
 import { CurrentUser } from "@/common/decorators/current-user.decorator";
 import { PageInput } from "@/common/graphql/pagination.graphql";
 import {
   NotificationsUseCase,
   type NotificationPreference,
 } from "@/modules/notifications/application/notifications.use-cases";
+import { PushNotificationsService } from "@/modules/notifications/application/push-notifications.service";
 import {
   NotificationType,
   type Notification,
@@ -14,13 +19,17 @@ import {
 import {
   NotificationPage,
   NotificationPreferenceType,
+  PushSubscriptionInput,
 } from "@/modules/notifications/presentation/graphql/notifications.graphql-types";
 import type { Paginated } from "@/shared/application/pagination";
 
 // Each user's own inbox: only a session is needed, never someone else's.
 @Resolver()
 export class NotificationsResolver {
-  constructor(private readonly notificationsUseCase: NotificationsUseCase) {}
+  constructor(
+    private readonly notificationsUseCase: NotificationsUseCase,
+    private readonly pushes: PushNotificationsService,
+  ) {}
 
   @Query(() => NotificationPage, { description: "Mais recentes primeiro." })
   myNotifications(
@@ -72,5 +81,48 @@ export class NotificationsResolver {
     @Args("emailEnabled") emailEnabled: boolean,
   ): Promise<NotificationPreference> {
     return this.notificationsUseCase.setPreference(user.id, type, emailEnabled);
+  }
+
+  @Query(() => String, {
+    nullable: true,
+    description:
+      "Chave VAPID para o navegador assinar o push (null = desligado).",
+  })
+  pushPublicKey(): string | null {
+    return this.pushes.publicKey();
+  }
+
+  @Mutation(() => Boolean, { description: "Ativa o push neste aparelho." })
+  async subscribePush(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args("input") input: PushSubscriptionInput,
+    @CurrentRequestMeta() meta: RequestMeta,
+  ): Promise<boolean> {
+    await this.pushes.subscribe(
+      user.id,
+      input,
+      meta.userAgent?.slice(0, 300) ?? null,
+    );
+    return true;
+  }
+
+  @Mutation(() => Boolean, { description: "Desativa o push neste aparelho." })
+  unsubscribePush(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args("endpoint") endpoint: string,
+  ): Promise<boolean> {
+    return this.pushes.unsubscribe(user.id, endpoint);
+  }
+
+  @Mutation(() => Int, {
+    description: "Envia um push de teste; devolve quantos aparelhos receberam.",
+  })
+  sendTestPush(@CurrentUser() user: AuthenticatedUser): Promise<number> {
+    return this.pushes.sendTo(user.id, {
+      title: "PM SHOW",
+      body: "As notificações estão funcionando neste aparelho.",
+      url: "/notificacoes",
+      tag: "test",
+    });
   }
 }

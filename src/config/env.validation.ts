@@ -69,4 +69,13 @@ export const envValidationSchema = Joi.object({
   AWS_ACCESS_KEY_ID: Joi.string().allow("").optional(),
   AWS_SECRET_ACCESS_KEY: Joi.string().allow("").optional(),
   MEDIA_MAX_AUDIO_MB: Joi.number().integer().min(1).max(200).default(50),
+
+  // === WEB PUSH (VAPID; generate with `npm run push:vapid`) ===
+  // Without the keys the API still boots; devices just can't subscribe.
+  VAPID_PUBLIC_KEY: Joi.string().allow("").optional(),
+  VAPID_PRIVATE_KEY: Joi.string().allow("").optional(),
+  VAPID_SUBJECT: Joi.string()
+    .pattern(/^(mailto:|https:\/\/)/)
+    .allow("")
+    .optional(),
 });

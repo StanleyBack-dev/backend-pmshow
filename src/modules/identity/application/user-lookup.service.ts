@@ -23,6 +23,11 @@ export class UserLookupService {
     @Inject(USER_REPOSITORY) private readonly users: UserRepositoryPort,
   ) {}
 
+  /** Every enabled account (announcements to the whole band). */
+  activeUserIds(): Promise<string[]> {
+    return this.users.listActiveIds();
+  }
+
   async findById(id: string): Promise<UserSummary | null> {
     const user = await this.users.findById(id);
     if (!user) return null;

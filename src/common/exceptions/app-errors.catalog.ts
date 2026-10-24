@@ -1,6 +1,7 @@
 import type { AppErrorDefinition } from "@/common/exceptions/app-error-definition.type";
 import { accessControlErrors } from "@/common/exceptions/catalogs/access-control-errors.catalog";
 import { availabilityErrors } from "@/common/exceptions/catalogs/availability-errors.catalog";
+import { broadcastsErrors } from "@/common/exceptions/catalogs/broadcasts-errors.catalog";
 import { authErrors } from "@/common/exceptions/catalogs/auth-errors.catalog";
 import { eventsErrors } from "@/common/exceptions/catalogs/events-errors.catalog";
 import { identityErrors } from "@/common/exceptions/catalogs/identity-errors.catalog";
@@ -15,6 +16,7 @@ export const APP_ERRORS = {
   accessControl: accessControlErrors,
   auth: authErrors,
   availability: availabilityErrors,
+  broadcasts: broadcastsErrors,
   events: eventsErrors,
   identity: identityErrors,
   mails: mailsErrors,

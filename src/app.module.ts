@@ -14,6 +14,8 @@ import { AccessControlModule } from "@/modules/access-control/access-control.mod
 import { PermissionsGuard } from "@/modules/access-control/presentation/guards/permissions.guard";
 import { AuditModule } from "@/modules/audit/audit.module";
 import { AvailabilityModule } from "@/modules/availability/availability.module";
+import { BroadcastsModule } from "@/modules/broadcasts/broadcasts.module";
+import { DashboardModule } from "@/modules/dashboard/dashboard.module";
 import { IdentityModule } from "@/modules/identity/identity.module";
 import { FirstAccessGuard } from "@/modules/identity/presentation/guards/first-access.guard";
 import { UserSessionGuard } from "@/modules/identity/presentation/guards/user-session.guard";
@@ -45,6 +47,8 @@ import { SharedModule } from "@/shared/shared.module";
     NotificationsModule,
     AvailabilityModule,
     RostersModule,
+    BroadcastsModule,
+    DashboardModule,
   ],
   providers: [
     AppResolver,

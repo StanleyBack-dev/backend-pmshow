@@ -43,6 +43,8 @@ export interface UserRepositoryPort {
     page: PageRequest,
   ): Promise<Paginated<UserAccount>>;
   countActiveInGroup(group: UserGroup): Promise<number>;
+  /** Ids of every enabled account. */
+  listActiveIds(): Promise<string[]>;
   /** User and credential in one transaction. */
   createWithCredential(user: NewUser, credential: NewCredential): Promise<User>;
   update(id: string, patch: UserPatch): Promise<User>;

@@ -5,12 +5,14 @@ name: Routines
 # secrets API_URL / CRON_SECRET exist, every run is skipped.
 #   - outbox: retries notifications the best-effort delivery after each
 #     change could not send (e-mail provider down, function frozen…);
-#   - media: removes audio uploads requested and never confirmed.
+#   - media: removes audio uploads requested and never confirmed;
+#   - rosters: morning reminders for today's and tomorrow's events.
 on:
   schedule:
     # GitHub may start scheduled runs a few minutes late; that is fine here.
     - cron: "*/15 * * * *"
     - cron: "30 6 * * *" # 03:30 in Goiás
+    - cron: "0 9 * * *" # 06:00 in Goiás
   workflow_dispatch:
 
 permissions:
@@ -52,3 +54,10 @@ jobs:
           curl --fail-with-body --silent --show-error --max-time 120 \
             -X POST -H "Authorization: Bearer $CRON_SECRET" \
             "$API_URL/internal/media/purge-stale-uploads"
+
+      - name: Send event reminders
+        if: steps.ready.outputs.ready == 'true' && (github.event.schedule == '0 9 * * *' || github.event_name == 'workflow_dispatch')
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 300 \
+            -X POST -H "Authorization: Bearer $CRON_SECRET" \
+            "$API_URL/internal/rosters/reminders"
