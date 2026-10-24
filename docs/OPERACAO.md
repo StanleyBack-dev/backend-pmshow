@@ -10,12 +10,12 @@ e o que fazer quando algo falha.
 secrets `API_URL` (URL pública da API) e `CRON_SECRET` em
 **Settings → Secrets and variables → Actions**.
 
-| Quando (horário de Goiás) | Rota                                   | O que faz                                                    |
-| ------------------------- | -------------------------------------- | ------------------------------------------------------------ |
-| A cada 15 min             | `POST /internal/outbox/process`        | Reenvia notificações que falharam (e-mail fora do ar etc.)    |
-| 03:30                     | `POST /internal/media/purge-stale-uploads` | Remove uploads de áudio iniciados e nunca confirmados     |
-| 03:30                     | `POST /internal/maintenance/cleanup`   | Apaga dados vencidos (veja "Retenção")                       |
-| 06:00                     | `POST /internal/rosters/reminders`     | Lembretes da véspera e do dia para os escalados              |
+| Quando (horário de Goiás) | Rota                                       | O que faz                                                  |
+| ------------------------- | ------------------------------------------ | ---------------------------------------------------------- |
+| A cada 15 min             | `POST /internal/outbox/process`            | Reenvia notificações que falharam (e-mail fora do ar etc.) |
+| 03:30                     | `POST /internal/media/purge-stale-uploads` | Remove uploads de áudio iniciados e nunca confirmados      |
+| 03:30                     | `POST /internal/maintenance/cleanup`       | Apaga dados vencidos (veja "Retenção")                     |
+| 06:00                     | `POST /internal/rosters/reminders`         | Lembretes da véspera e do dia para os escalados            |
 
 Para rodar na hora: **Actions → Routines → Run workflow** (roda todas as etapas).
 
@@ -23,27 +23,27 @@ Para rodar na hora: **Actions → Routines → Run workflow** (roda todas as eta
 
 A limpeza diária guarda só o necessário:
 
-| Dado                                   | Fica por                     |
-| -------------------------------------- | ---------------------------- |
-| Sessões encerradas (com IP e navegador) | 30 dias depois do fim       |
-| Códigos de recuperação de senha         | 7 dias depois de expirar    |
-| Mensagens entregues da fila (outbox)    | 30 dias                     |
-| Notificações lidas                      | 1 ano                       |
-| Contadores de limite por IP             | 1 dia (só o HMAC do IP)     |
+| Dado                                    | Fica por                 |
+| --------------------------------------- | ------------------------ |
+| Sessões encerradas (com IP e navegador) | 30 dias depois do fim    |
+| Códigos de recuperação de senha         | 7 dias depois de expirar |
+| Mensagens entregues da fila (outbox)    | 30 dias                  |
+| Notificações lidas                      | 1 ano                    |
+| Contadores de limite por IP             | 1 dia (só o HMAC do IP)  |
 
 A trilha de auditoria **não** é apagada: ela registra quem fez o quê nas
 ações administrativas.
 
 ## Backup e restauração (Neon)
 
-O Neon guarda o histórico do banco (*point-in-time restore*). O tamanho da
+O Neon guarda o histórico do banco (_point-in-time restore_). O tamanho da
 janela depende do plano: confira em **Project → Settings → Storage**.
 
 ### Restaurar um momento anterior
 
 1. No console do Neon, abra o projeto → **Branches** → **Create branch**.
 2. Escolha a branch de produção como origem e marque **Past data**
-   (*point in time*), com a data e a hora desejadas.
+   (_point in time_), com a data e a hora desejadas.
 3. Confira os dados na branch nova, pelo **SQL Editor** ou apontando uma API
    local para a connection string dela.
 4. Para voltar a produção a esse ponto, use **Restore** na branch de produção,

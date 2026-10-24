@@ -44,7 +44,7 @@ src/modules/<módulo>/
 | `availability`   | Indisponibilidades (férias, licença, missão…) com aprovação                                                                                                          |
 | `rosters`        | Escalas: regras de conflito, publicação, ciência, avisos e lembretes                                                                                                 |
 | `outbox`         | Fila transacional entre módulos, com novas tentativas                                                                                                                |
-| `notifications`  | Caixa de entrada, e-mail (com `.ics`) e Web Push, com preferências por pessoa                                                                                         |
+| `notifications`  | Caixa de entrada, e-mail (com `.ics`) e Web Push, com preferências por pessoa                                                                                        |
 | `broadcasts`     | Comunicados para a banda, um naipe ou os escalados de um evento                                                                                                      |
 | `dashboard`      | Painel do gestor (contagens só de leitura)                                                                                                                           |
 | `maintenance`    | Limpeza diária de dados vencidos (sessões, códigos, fila, notificações lidas)                                                                                        |
