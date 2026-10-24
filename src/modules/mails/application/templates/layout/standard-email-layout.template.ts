@@ -55,8 +55,8 @@ export function renderStandardEmailLayout({
           <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background:${EMAIL_BRAND.surface};border:1px solid ${EMAIL_BRAND.border};border-radius:16px;overflow:hidden;">
             <tr>
               <td style="padding:22px 28px;background:${EMAIL_BRAND.headerBackground};">
-                <div style="font-size:15px;font-weight:800;letter-spacing:1px;color:${EMAIL_BRAND.white};">PM <span style="color:${EMAIL_BRAND.accent};">SHOW</span></div>
-                <h1 style="margin:14px 0 0 0;font-size:21px;line-height:1.3;color:${EMAIL_BRAND.white};">${escapeHtml(heading)}</h1>
+                <div style="font-size:15px;font-weight:800;letter-spacing:1px;color:${EMAIL_BRAND.headerText};">PM <span style="color:${EMAIL_BRAND.gold};">SHOW</span></div>
+                <h1 style="margin:14px 0 0 0;font-size:21px;line-height:1.3;color:${EMAIL_BRAND.headerText};">${escapeHtml(heading)}</h1>
               </td>
             </tr>
             <tr>
