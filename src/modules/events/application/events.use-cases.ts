@@ -3,6 +3,7 @@ import type { AuthenticatedUser } from "@/common/auth/authenticated-user";
 import { APP_ERRORS } from "@/common/exceptions/app-errors.catalog";
 import { AppException } from "@/common/exceptions/app-exception";
 import { AuditTrailService } from "@/modules/audit/application/audit-trail.service";
+import { eventChangedDraft } from "@/modules/events/application/event-changes";
 import {
   EVENT_REPOSITORY,
   VENUE_REPOSITORY,
@@ -21,6 +22,7 @@ import {
   type SetlistItem,
   type StatusDenial,
 } from "@/modules/events/domain/event";
+import { OutboxDispatcher } from "@/modules/outbox/application/outbox-dispatcher.service";
 import { SongsUseCase } from "@/modules/repertoire/application/songs.use-cases";
 import { CLOCK, type ClockPort } from "@/shared/application/ports/clock.port";
 
@@ -51,6 +53,16 @@ const STATUS_DENIAL_MESSAGES: Record<StatusDenial, string> = {
 
 const text = (value: string | null | undefined) => value?.trim() || null;
 
+const sameInstant = (a: Date | null, b: Date | null) =>
+  (a?.getTime() ?? null) === (b?.getTime() ?? null);
+
+/** What people on the event must be told about: when and where. */
+const rescheduled = (before: BandEvent, after: BandEvent) =>
+  !sameInstant(before.callTime, after.callTime) ||
+  !sameInstant(before.startsAt, after.startsAt) ||
+  !sameInstant(before.endsAt, after.endsAt) ||
+  before.venueId !== after.venueId;
+
 const snapshot = (event: BandEvent) => ({
   title: event.title,
   type: event.type,
@@ -69,6 +81,7 @@ export class EventsUseCase {
     @Inject(CLOCK) private readonly clock: ClockPort,
     private readonly songs: SongsUseCase,
     private readonly audit: AuditTrailService,
+    private readonly outbox: OutboxDispatcher,
   ) {}
 
   list(filter: EventFilter): Promise<BandEvent[]> {
@@ -92,6 +105,10 @@ export class EventsUseCase {
       throw AppException.from(APP_ERRORS.events.eventNotFound, undefined);
     }
     return event;
+  }
+
+  findMany(ids: readonly string[]): Promise<BandEvent[]> {
+    return this.events.findByIds(ids);
   }
 
   setlist(eventId: string): Promise<SetlistItem[]> {
@@ -120,7 +137,16 @@ export class EventsUseCase {
     input: EventInput,
   ): Promise<BandEvent> {
     const before = await this.editable(id);
-    const event = await this.events.update(id, await this.toData(input));
+    const data = await this.toData(input);
+    const changed = rescheduled(before, { ...before, ...data });
+    const event = await this.events.update(
+      id,
+      data,
+      changed
+        ? [eventChangedDraft({ eventId: id, change: "RESCHEDULED" })]
+        : [],
+    );
+    if (changed) this.outbox.kick();
     await this.record(
       actor,
       "event.updated",
@@ -148,11 +174,16 @@ export class EventsUseCase {
         reason: STATUS_DENIAL_MESSAGES[denial],
       });
     }
+    const cancelled = status === EventStatus.CANCELADO;
     const event = await this.events.setStatus(
       id,
       status,
-      status === EventStatus.CANCELADO ? text(reason) : null,
+      cancelled ? text(reason) : null,
+      cancelled
+        ? [eventChangedDraft({ eventId: id, change: "CANCELLED" })]
+        : [],
     );
+    if (cancelled) this.outbox.kick();
     await this.record(
       actor,
       "event.status_changed",

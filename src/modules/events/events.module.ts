@@ -21,10 +21,12 @@ import {
   EventsResolver,
   SetlistEntryFieldsResolver,
 } from "@/modules/events/presentation/graphql/events.resolver";
+import { OutboxModule } from "@/modules/outbox/outbox.module";
 import { RepertoireModule } from "@/modules/repertoire/repertoire.module";
 
 // The agenda: events (shows, parades, rehearsals…), their venues and
-// setlists. Rosters (phase 4) attach to events from their own module.
+// setlists. Rosters attach to events from their own module and learn about
+// schedule changes through the outbox ("event.changed").
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -34,6 +36,7 @@ import { RepertoireModule } from "@/modules/repertoire/repertoire.module";
     ]),
     RepertoireModule,
     AuditModule,
+    OutboxModule,
   ],
   providers: [
     EventsUseCase,
@@ -44,6 +47,6 @@ import { RepertoireModule } from "@/modules/repertoire/repertoire.module";
     { provide: EVENT_REPOSITORY, useClass: EventTypeormRepository },
     { provide: VENUE_REPOSITORY, useClass: VenueTypeormRepository },
   ],
-  exports: [EventsUseCase],
+  exports: [EventsUseCase, VenuesUseCase],
 })
 export class EventsModule {}

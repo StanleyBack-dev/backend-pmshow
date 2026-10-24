@@ -5,6 +5,7 @@ import type {
   SetlistItem,
   Venue,
 } from "@/modules/events/domain/event";
+import type { OutboxDraft } from "@/modules/outbox/domain/outbox";
 
 export type EventFilter = {
   /** Events starting at or after this instant. */
@@ -24,12 +25,19 @@ export interface EventRepositoryPort {
   /** Ordered by start; capped at `limit`. */
   list(filter: EventFilter, limit: number): Promise<BandEvent[]>;
   findById(id: string): Promise<BandEvent | null>;
+  findByIds(ids: readonly string[]): Promise<BandEvent[]>;
   create(data: EventData, createdBy: string): Promise<BandEvent>;
-  update(id: string, data: Partial<EventData>): Promise<BandEvent>;
+  /** The change and its outbox messages, in one transaction. */
+  update(
+    id: string,
+    data: Partial<EventData>,
+    messages: readonly OutboxDraft[],
+  ): Promise<BandEvent>;
   setStatus(
     id: string,
     status: EventStatus,
     cancellationReason: string | null,
+    messages: readonly OutboxDraft[],
   ): Promise<BandEvent>;
   findSetlist(eventId: string): Promise<SetlistItem[]>;
   replaceSetlist(eventId: string, items: SetlistItem[]): Promise<void>;

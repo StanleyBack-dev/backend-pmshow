@@ -19,6 +19,8 @@ import {
   EventSongOrmEntity,
   VenueOrmEntity,
 } from "@/modules/events/infrastructure/persistence/typeorm/event.orm-entity";
+import type { OutboxDraft } from "@/modules/outbox/domain/outbox";
+import { OutboxTypeormWriter } from "@/modules/outbox/infrastructure/persistence/typeorm/outbox-typeorm.repository";
 
 const toEvent = (row: EventOrmEntity): BandEvent => ({
   id: row.id,
@@ -59,6 +61,7 @@ export class EventTypeormRepository implements EventRepositoryPort {
     @InjectRepository(EventOrmEntity)
     private readonly repository: Repository<EventOrmEntity>,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly outbox: OutboxTypeormWriter,
   ) {}
 
   async list(filter: EventFilter, limit: number): Promise<BandEvent[]> {
@@ -80,6 +83,12 @@ export class EventTypeormRepository implements EventRepositoryPort {
     return row ? toEvent(row) : null;
   }
 
+  async findByIds(ids: readonly string[]): Promise<BandEvent[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.repository.find({ where: { id: In([...ids]) } });
+    return rows.map(toEvent);
+  }
+
   async create(data: EventData, createdBy: string): Promise<BandEvent> {
     const saved = await this.repository.save(
       this.repository.create({
@@ -91,8 +100,15 @@ export class EventTypeormRepository implements EventRepositoryPort {
     return toEvent(saved);
   }
 
-  async update(id: string, data: Partial<EventData>): Promise<BandEvent> {
-    await this.repository.update({ id }, defined(data));
+  async update(
+    id: string,
+    data: Partial<EventData>,
+    messages: readonly OutboxDraft[],
+  ): Promise<BandEvent> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(EventOrmEntity).update({ id }, defined(data));
+      await this.outbox.write(manager, messages);
+    });
     return toEvent(await this.repository.findOneOrFail({ where: { id } }));
   }
 
@@ -100,8 +116,14 @@ export class EventTypeormRepository implements EventRepositoryPort {
     id: string,
     status: EventStatus,
     cancellationReason: string | null,
+    messages: readonly OutboxDraft[],
   ): Promise<BandEvent> {
-    await this.repository.update({ id }, { status, cancellationReason });
+    await this.dataSource.transaction(async (manager) => {
+      await manager
+        .getRepository(EventOrmEntity)
+        .update({ id }, { status, cancellationReason });
+      await this.outbox.write(manager, messages);
+    });
     return toEvent(await this.repository.findOneOrFail({ where: { id } }));
   }
 

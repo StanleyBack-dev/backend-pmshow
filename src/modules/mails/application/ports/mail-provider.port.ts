@@ -3,6 +3,13 @@ export interface MailAddress {
   name?: string;
 }
 
+export interface MailAttachment {
+  name: string;
+  /** Raw file content (UTF-8 text, e.g. an .ics calendar). */
+  content: string;
+  contentType: string;
+}
+
 export interface SendMailCommand {
   to: MailAddress;
   subject: string;
@@ -10,6 +17,7 @@ export interface SendMailCommand {
   text?: string;
   replyTo?: MailAddress;
   tags?: string[];
+  attachments?: MailAttachment[];
 }
 
 export interface MailProviderPort {

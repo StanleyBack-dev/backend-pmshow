@@ -54,6 +54,10 @@ export class BrevoMailProvider implements MailProviderPort {
           ? { email: command.replyTo.email, name: command.replyTo.name }
           : undefined,
         tags: command.tags,
+        attachment: command.attachments?.map((file) => ({
+          name: file.name,
+          content: Buffer.from(file.content, "utf8").toString("base64"),
+        })),
       }),
     });
 
