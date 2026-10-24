@@ -47,6 +47,7 @@ import {
   isEmptyDiff,
   mergeAcks,
   normalizeAssignments,
+  reminderFor,
   RosterStatus,
   uncoveredSections,
   type Assignment,
@@ -339,6 +340,73 @@ export class RostersUseCase implements OnModuleInit {
       after: { status, note: reason },
     });
     return { ...line, ackStatus: status, ackNote: reason, ackAt: at };
+  }
+
+  /**
+   * Morning run (scheduled workflow): reminds everyone on the published
+   * rosters of today's and tomorrow's events. Dedupe keys make a second run
+   * on the same day harmless.
+   */
+  async sendReminders(): Promise<{ events: number; reminders: number }> {
+    const now = this.clock.now();
+    const today = this.clock.localDate(now);
+    const tomorrowStart = this.clock.startOfNextLocalDay(now);
+    const tomorrow = this.clock.localDate(tomorrowStart);
+    const events = await this.events.list({
+      from: this.clock.startOfLocalDate(today),
+      to: this.clock.startOfNextLocalDay(tomorrowStart),
+      statuses: OPEN_STATUSES,
+    });
+
+    let band: Awaited<ReturnType<MembersUseCase["bandMembers"]>> | null = null;
+    let remindedEvents = 0;
+    const drafts: OutboxDraft[] = [];
+    for (const event of events) {
+      const kind = reminderFor(
+        {
+          startsOnDay: this.clock.localDate(event.startsAt),
+          window: eventWindow(event),
+        },
+        { today, tomorrow, now },
+      );
+      if (!kind) continue;
+      const roster = await this.rosters.find(event.id);
+      if (roster?.status !== RosterStatus.PUBLICADA) continue;
+      if (roster.assignments.length === 0) continue;
+
+      band ??= await this.members.bandMembers();
+      const byUser = new Map(
+        band.map((entry) => [
+          entry.userId,
+          { instruments: entry.profile?.instruments ?? [] },
+        ]),
+      );
+      const context = await this.noticeContext(event);
+      remindedEvents += 1;
+      for (const item of roster.assignments) {
+        drafts.push(
+          deliveryDraft(
+            rosterNotice(
+              kind === "today" ? "reminder-today" : "reminder-tomorrow",
+              item.userId,
+              this.noticeLine(roster.assignments, byUser, item.userId),
+              context,
+            ),
+            `reminder:${event.id}:${item.userId}:${kind}:${today}`,
+          ),
+        );
+      }
+    }
+    await this.outbox.enqueue(drafts);
+    return { events: remindedEvents, reminders: drafts.length };
+  }
+
+  /** Who is on the published roster of an event (for announcements). */
+  async publishedAssignees(eventId: string): Promise<string[]> {
+    const roster = await this.rosters.find(eventId);
+    return roster?.status === RosterStatus.PUBLICADA
+      ? roster.assignments.map((item) => item.userId)
+      : [];
   }
 
   /** Outbox handler: tell everyone on a published roster about the change. */

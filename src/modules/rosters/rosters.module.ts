@@ -18,6 +18,7 @@ import {
   MyAssignmentFieldsResolver,
   RostersResolver,
 } from "@/modules/rosters/presentation/graphql/rosters.resolver";
+import { InternalRostersController } from "@/modules/rosters/presentation/rest/internal-rosters.controller";
 
 // Rosters (escalas): who goes to each event. Reads events, members and
 // absences through their use cases; notifies through the outbox.
@@ -31,6 +32,7 @@ import {
     MembersModule,
     OutboxModule,
   ],
+  controllers: [InternalRostersController],
   providers: [
     RostersUseCase,
     RostersResolver,
@@ -38,5 +40,6 @@ import {
     MyAssignmentFieldsResolver,
     { provide: ROSTER_REPOSITORY, useClass: RosterTypeormRepository },
   ],
+  exports: [RostersUseCase],
 })
 export class RostersModule {}

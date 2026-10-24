@@ -9,6 +9,7 @@ import {
   isEmptyDiff,
   mergeAcks,
   normalizeAssignments,
+  reminderFor,
   uncoveredSections,
   windowsOverlap,
   type Assignment,
@@ -217,5 +218,50 @@ describe("uncoveredSections", () => {
     expect(
       uncoveredSections(["METAIS", "PERCUSSAO", "METAIS", "VOCAL"], ["METAIS"]),
     ).toEqual(["PERCUSSAO", "VOCAL"]);
+  });
+});
+
+describe("reminderFor", () => {
+  const now = at("06:00");
+  const context = { today: "2026-11-15", tomorrow: "2026-11-16", now };
+  const window = (from: string) => ({
+    from: at(from),
+    to: at("23:00"),
+  });
+
+  it("reminds tomorrow's events", () => {
+    expect(
+      reminderFor(
+        { startsOnDay: "2026-11-16", window: window("10:00") },
+        context,
+      ),
+    ).toBe("tomorrow");
+  });
+
+  it("reminds today's events that haven't begun", () => {
+    expect(
+      reminderFor(
+        { startsOnDay: "2026-11-15", window: window("08:00") },
+        context,
+      ),
+    ).toBe("today");
+  });
+
+  it("skips today's events whose call time already passed", () => {
+    expect(
+      reminderFor(
+        { startsOnDay: "2026-11-15", window: window("05:30") },
+        context,
+      ),
+    ).toBe(null);
+  });
+
+  it("skips later days", () => {
+    expect(
+      reminderFor(
+        { startsOnDay: "2026-11-17", window: window("08:00") },
+        context,
+      ),
+    ).toBe(null);
   });
 });

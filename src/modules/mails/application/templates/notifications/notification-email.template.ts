@@ -48,7 +48,7 @@ export function renderNotificationEmail(
     heading: content.subject,
     contentHtml: `
       <p>Olá, ${escapeHtml(firstName(content.recipientName))}!</p>
-      <p>${escapeHtml(content.intro)}</p>
+      <p style="white-space:pre-line;">${escapeHtml(content.intro)}</p>
       ${detailsTable(content.details)}
       ${calendarHint}`,
     ctaLabel: content.ctaLabel,

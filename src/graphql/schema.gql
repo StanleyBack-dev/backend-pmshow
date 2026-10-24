@@ -70,6 +70,59 @@ enum AbsenceStatus {
   CANCELADA
 }
 
+"""Comunicado enviado por um gestor."""
+type Broadcast {
+  id: ID!
+  title: String!
+  body: String!
+  audience: BroadcastAudience!
+  section: Section
+  eventId: ID
+  sendEmail: Boolean!
+
+  """Quantas pessoas receberam."""
+  recipients: Int!
+  authorName: String
+  createdAt: DateTime!
+}
+
+"""Quem recebe o comunicado."""
+enum BroadcastAudience {
+  TODOS
+  NAIPE
+  ESCALA_EVENTO
+}
+
+"""Naipe da banda."""
+enum Section {
+  MADEIRAS
+  METAIS
+  PERCUSSAO
+  CORDAS_BASE
+  VOCAL
+  TECNICA
+  APOIO
+}
+
+"""Painel do gestor."""
+type BandDashboard {
+  activeMembers: Int!
+  awayMembers: Int!
+
+  """Eventos nos próximos 30 dias."""
+  upcomingEvents: Int!
+
+  """Desses, sem escala publicada."""
+  eventsWithoutRoster: Int!
+  pendingAcks: Int!
+  swapRequests: Int!
+  pendingAbsences: Int!
+  absentToday: Int!
+
+  """Notificações que falharam de vez."""
+  failedNotifications: Int!
+}
+
 """Local de apresentação."""
 type Venue {
   id: ID!
@@ -351,17 +404,6 @@ type Instrument {
   archived: Boolean!
 }
 
-"""Naipe da banda."""
-enum Section {
-  MADEIRAS
-  METAIS
-  PERCUSSAO
-  CORDAS_BASE
-  VOCAL
-  TECNICA
-  APOIO
-}
-
 type MemberInstrument {
   instrumentId: ID!
   name: String!
@@ -453,6 +495,8 @@ enum NotificationType {
   EVENT_CANCELLED
   ROSTER_SWAP_REQUESTED
   ABSENCE_REVIEWED
+  EVENT_REMINDER
+  BROADCAST
 }
 
 type NotificationPage {
@@ -603,6 +647,10 @@ type Query {
   """Até 500, das mais recentes."""
   absences(filter: AbsenceFilterInput): [Absence!]!
 
+  """Últimos 50 comunicados."""
+  broadcasts: [Broadcast!]!
+  bandDashboard: BandDashboard!
+
   """Eventos por período (ordenados pelo início, até 500)."""
   events(filter: EventFilterInput): [Event!]!
 
@@ -633,6 +681,9 @@ type Query {
   myNotifications(unreadOnly: Boolean! = false, page: PageInput): NotificationPage!
   unreadNotificationsCount: Int!
   myNotificationPreferences: [NotificationPreference!]!
+
+  """Chave VAPID para o navegador assinar o push (null = desligado)."""
+  pushPublicKey: String
   songs(filter: SongFilterInput, page: PageInput): SongPage!
   song(id: ID!): Song!
 
@@ -716,6 +767,7 @@ type Mutation {
   registerAbsence(userId: ID!, input: AbsenceInput!): Absence!
   reviewAbsence(id: ID!, approve: Boolean!, note: String): Absence!
   cancelAbsence(id: ID!): Absence!
+  sendBroadcast(input: BroadcastInput!): Broadcast!
   createEvent(input: EventInput!): Event!
   updateEvent(id: ID!, input: EventInput!): Event!
 
@@ -784,6 +836,15 @@ type Mutation {
   """Quantas foram marcadas."""
   markAllNotificationsRead: Int!
   setNotificationPreference(type: NotificationType!, emailEnabled: Boolean!): NotificationPreference!
+
+  """Ativa o push neste aparelho."""
+  subscribePush(input: PushSubscriptionInput!): Boolean!
+
+  """Desativa o push neste aparelho."""
+  unsubscribePush(endpoint: String!): Boolean!
+
+  """Envia um push de teste; devolve quantos aparelhos receberam."""
+  sendTestPush: Int!
   createSong(input: SongInput!): Song!
   updateSong(id: ID!, input: SongInput!): Song!
 
@@ -811,6 +872,17 @@ input AbsenceInput {
   """AAAA-MM-DD"""
   endsOn: String!
   reason: String
+}
+
+input BroadcastInput {
+  title: String!
+  body: String!
+  audience: BroadcastAudience!
+  section: Section
+  eventId: ID
+
+  """Também envia por e-mail."""
+  sendEmail: Boolean!
 }
 
 input EventInput {
@@ -949,6 +1021,17 @@ input UpdateInstrumentInput {
   name: String
   section: Section
   archived: Boolean
+}
+
+"""PushSubscription do navegador (PushManager)."""
+input PushSubscriptionInput {
+  endpoint: String!
+
+  """Chave pública do aparelho (base64url)."""
+  p256dh: String!
+
+  """Segredo de autenticação (base64url)."""
+  auth: String!
 }
 
 input SongInput {

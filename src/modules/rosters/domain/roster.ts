@@ -234,3 +234,19 @@ export function uncoveredSections<S extends string>(
     (section) => !covered.has(section),
   );
 }
+
+/**
+ * Which reminder an event gets on the morning run: "tomorrow" for events
+ * starting tomorrow, "today" for today's events whose call time (or start)
+ * hasn't passed yet. Days are calendar dates in the app timezone.
+ */
+export function reminderFor(
+  event: { startsOnDay: string; window: Window },
+  context: { today: string; tomorrow: string; now: Date },
+): "today" | "tomorrow" | null {
+  if (event.startsOnDay === context.tomorrow) return "tomorrow";
+  if (event.startsOnDay === context.today && event.window.from > context.now) {
+    return "today";
+  }
+  return null;
+}

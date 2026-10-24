@@ -12,6 +12,10 @@ export enum NotificationType {
   ROSTER_SWAP_REQUESTED = "ROSTER_SWAP_REQUESTED",
   /** Your absence request was approved or denied. */
   ABSENCE_REVIEWED = "ABSENCE_REVIEWED",
+  /** Day before and morning of an event you are on. */
+  EVENT_REMINDER = "EVENT_REMINDER",
+  /** A manager's announcement (comunicado). */
+  BROADCAST = "BROADCAST",
 }
 
 export const ALL_NOTIFICATION_TYPES: readonly NotificationType[] =

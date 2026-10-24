@@ -15,7 +15,13 @@ export const ROLE_LABELS: Record<AssignmentRole, string> = {
 };
 
 export type NoticeKind =
-  "published" | "updated" | "removed" | "rescheduled" | "cancelled";
+  | "published"
+  | "updated"
+  | "removed"
+  | "rescheduled"
+  | "cancelled"
+  | "reminder-tomorrow"
+  | "reminder-today";
 
 export type NoticeContext = {
   event: BandEvent;
@@ -67,7 +73,22 @@ const KIND: Record<
     subject: "Evento cancelado",
     intro: "Um evento em que você estava escalado foi cancelado.",
   },
+  "reminder-tomorrow": {
+    type: NotificationType.EVENT_REMINDER,
+    title: "Amanhã",
+    subject: "Lembrete: amanhã",
+    intro: "Lembrete do evento de amanhã em que você está escalado.",
+  },
+  "reminder-today": {
+    type: NotificationType.EVENT_REMINDER,
+    title: "Hoje",
+    subject: "Lembrete: hoje",
+    intro: "Lembrete do evento de hoje em que você está escalado.",
+  },
 };
+
+const isReminder = (kind: NoticeKind) =>
+  kind === "reminder-tomorrow" || kind === "reminder-today";
 
 const venueText = (venue: Venue | null) =>
   venue
@@ -131,22 +152,25 @@ export function rosterNotice(
       details,
       ctaLabel: "Abrir no app",
     },
-    calendar: {
-      uid: `event-${event.id}@pmshow`,
-      sequence: context.sequence,
-      cancelled: removedFromCalendar,
-      start: window.from.toISOString(),
-      end: window.to.toISOString(),
-      summary: `PM SHOW · ${event.title}`,
-      location: where,
-      description:
-        [
-          role ? `Função: ${role}` : null,
-          event.uniform ? `Uniforme: ${event.uniform}` : null,
-        ]
-          .filter(Boolean)
-          .join("\n") || null,
-    },
+    // Reminders don't touch the calendar entry sent with the roster.
+    calendar: isReminder(kind)
+      ? null
+      : {
+          uid: `event-${event.id}@pmshow`,
+          sequence: context.sequence,
+          cancelled: removedFromCalendar,
+          start: window.from.toISOString(),
+          end: window.to.toISOString(),
+          summary: `PM SHOW · ${event.title}`,
+          location: where,
+          description:
+            [
+              role ? `Função: ${role}` : null,
+              event.uniform ? `Uniforme: ${event.uniform}` : null,
+            ]
+              .filter(Boolean)
+              .join("\n") || null,
+        },
   };
 }
 
