@@ -38,8 +38,9 @@ src/modules/<módulo>/
 | `audit`          | Trilha de auditoria das ações administrativas (a leitura exige `AUDIT_READ`)                                                                                         |
 | `mails`          | Provider (log ou Brevo) + templates                                                                                                                                  |
 | `members`        | Perfil na banda: nome de guerra, posto/graduação, naipe, situação e instrumentos                                                                                     |
-| `repertoire`     | Músicas, categorias, tonalidade, tags e busca sem acento                                                                                                             |
-| `media`          | Áudios (Neon Object Storage, URLs assinadas) e vídeos do YouTube                                                                                                     |
+| `artists`        | Cantores e bandas do repertório (cadastro, arquivamento, nome sem duplicar)                                                                                          |
+| `repertoire`     | Músicas, situação (nova / já tocamos), filtros, busca sem acento e letras (LRCLIB, lyrics.ovh)                                                                       |
+| `media`          | Áudios (Neon Object Storage, URLs assinadas), vídeos e busca no YouTube                                                                                              |
 | `events`         | Agenda: eventos, locais e setlist por evento                                                                                                                         |
 | `availability`   | Indisponibilidades (férias, licença, missão…) com aprovação                                                                                                          |
 | `rosters`        | Escalas: regras de conflito, publicação, ciência, avisos e lembretes                                                                                                 |

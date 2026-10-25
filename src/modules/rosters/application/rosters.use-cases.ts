@@ -30,6 +30,7 @@ import {
   ROSTER_REPOSITORY,
   type EventAssignment,
   type RosterRepositoryPort,
+  type RosterSummary,
 } from "@/modules/rosters/application/ports/roster-repository.port";
 import {
   rosterNotice,
@@ -98,6 +99,11 @@ export class RostersUseCase implements OnModuleInit {
     private readonly outbox: OutboxDispatcher,
     private readonly handlers: OutboxHandlers,
   ) {}
+
+  /** Status and size of the rosters of these events (lists of events). */
+  summaries(eventIds: readonly string[]): Promise<Map<string, RosterSummary>> {
+    return this.rosters.summaries(eventIds);
+  }
 
   onModuleInit(): void {
     this.handlers.register(EVENT_CHANGED_TOPIC, (message) =>

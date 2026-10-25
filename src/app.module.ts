@@ -12,6 +12,7 @@ import { DatabaseModule } from "@/database/database.module";
 import { EventsModule } from "@/modules/events/events.module";
 import { AccessControlModule } from "@/modules/access-control/access-control.module";
 import { PermissionsGuard } from "@/modules/access-control/presentation/guards/permissions.guard";
+import { ArtistsModule } from "@/modules/artists/artists.module";
 import { AuditModule } from "@/modules/audit/audit.module";
 import { AvailabilityModule } from "@/modules/availability/availability.module";
 import { BroadcastsModule } from "@/modules/broadcasts/broadcasts.module";
@@ -41,6 +42,7 @@ import { SharedModule } from "@/shared/shared.module";
     AccessControlModule,
     IdentityModule,
     MembersModule,
+    ArtistsModule,
     RepertoireModule,
     MediaModule,
     EventsModule,

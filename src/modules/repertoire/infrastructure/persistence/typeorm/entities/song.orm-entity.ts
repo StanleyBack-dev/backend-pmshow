@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
-import { SongCategory } from "@/modules/repertoire/domain/song";
+import { SongCategory, SongStage } from "@/modules/repertoire/domain/song";
 
 @Entity("tb_songs")
 export class SongOrmEntity {
@@ -15,8 +15,12 @@ export class SongOrmEntity {
   @Column({ type: "varchar", length: 160 })
   title!: string;
 
-  @Column({ type: "varchar", length: 160, nullable: true })
-  artist!: string | null;
+  // FK to tb_artists lives in the migration (ON DELETE SET NULL).
+  @Column({ name: "idtb_artists", type: "uuid", nullable: true })
+  artistId!: string | null;
+
+  @Column({ type: "varchar", length: 10, default: SongStage.CONHECIDA })
+  stage!: SongStage;
 
   @Column({ type: "varchar", length: 160, nullable: true })
   arranger!: string | null;

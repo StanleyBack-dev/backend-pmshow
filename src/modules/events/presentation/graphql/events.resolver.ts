@@ -12,10 +12,12 @@ import {
 } from "@nestjs/graphql";
 import type { AuthenticatedUser } from "@/common/auth/authenticated-user";
 import { CurrentUser } from "@/common/decorators/current-user.decorator";
+import { PageInput } from "@/common/graphql/pagination.graphql";
 import { requestLoader } from "@/common/graphql/request-loader";
 import { Permission } from "@/modules/access-control/domain/permission";
 import { RequirePermissions } from "@/modules/access-control/presentation/decorators/require-permissions.decorator";
 import { EventsUseCase } from "@/modules/events/application/events.use-cases";
+import type { ZipCodeAddress } from "@/modules/events/application/ports/events.ports";
 import { VenuesUseCase } from "@/modules/events/application/venues.use-cases";
 import {
   EventStatus,
@@ -23,17 +25,24 @@ import {
   type SetlistItem,
   type Venue,
 } from "@/modules/events/domain/event";
+import { formatVenueAddress } from "@/modules/events/domain/venue-address";
 import {
   EventFilterInput,
   EventGqlType,
   EventInput,
+  EventPage,
+  EventPageFilterInput,
   SetlistEntryType,
   SetlistInput,
+  VenueFilterInput,
   VenueInput,
+  VenuePage,
   VenueType,
+  ZipCodeAddressType,
 } from "@/modules/events/presentation/graphql/events.graphql-types";
 import { SongsUseCase } from "@/modules/repertoire/application/songs.use-cases";
 import type { Song } from "@/modules/repertoire/domain/song";
+import type { Paginated as PaginatedResult } from "@/shared/application/pagination";
 import { SongType } from "@/modules/repertoire/presentation/graphql/repertoire.graphql-types";
 
 const Id = () => new ParseUUIDPipe({ version: "4" });
@@ -53,6 +62,25 @@ export class EventsResolver {
     @Args("filter", { nullable: true }) filter?: EventFilterInput,
   ): Promise<BandEvent[]> {
     return this.eventsUseCase.list(filter ?? {});
+  }
+
+  @RequirePermissions(Permission.EVENTS_READ)
+  @Query(() => EventPage, {
+    description: "Página de eventos: busca, tipo, situação e período.",
+  })
+  eventsPage(
+    @Args("filter", { nullable: true }) filter?: EventPageFilterInput,
+    @Args("page", { nullable: true }) page?: PageInput,
+  ): Promise<PaginatedResult<BandEvent>> {
+    return this.eventsUseCase.page(
+      {
+        search: filter?.search,
+        type: filter?.type,
+        statuses: filter?.statuses,
+        period: filter?.period,
+      },
+      page ?? { page: 1, limit: 10 },
+    );
   }
 
   @RequirePermissions(Permission.EVENTS_READ)
@@ -107,7 +135,7 @@ export class EventsResolver {
 
   @RequirePermissions(Permission.EVENTS_MANAGE)
   @Mutation(() => [SetlistEntryType], {
-    description: "Substitui o setlist do evento pela lista, na ordem dada.",
+    description: "Substitui a lista de músicas do evento, na ordem dada.",
   })
   setEventSetlist(
     @CurrentUser() actor: AuthenticatedUser,
@@ -115,6 +143,29 @@ export class EventsResolver {
     @Args("input") input: SetlistInput,
   ): Promise<SetlistItem[]> {
     return this.eventsUseCase.replaceSetlist(actor, id, input.items);
+  }
+
+  @RequirePermissions(Permission.EVENTS_READ)
+  @Query(() => VenuePage, { description: "Página de locais, com busca." })
+  venuesPage(
+    @Args("filter", { nullable: true }) filter?: VenueFilterInput,
+    @Args("page", { nullable: true }) page?: PageInput,
+  ): Promise<PaginatedResult<Venue>> {
+    return this.venuesUseCase.page(
+      { search: filter?.search, archived: filter?.archived ?? false },
+      page ?? { page: 1, limit: 10 },
+    );
+  }
+
+  @RequirePermissions(Permission.EVENTS_MANAGE)
+  @Query(() => ZipCodeAddressType, {
+    nullable: true,
+    description: "Endereço de um CEP (ViaCEP); null se não existir.",
+  })
+  zipCodeAddress(
+    @Args("zipCode") zipCode: string,
+  ): Promise<ZipCodeAddress | null> {
+    return this.venuesUseCase.findZipCode(zipCode);
   }
 
   @RequirePermissions(Permission.EVENTS_READ)
@@ -170,6 +221,17 @@ export class EventFieldsResolver {
   setlist(@Parent() event: BandEvent): Promise<SetlistItem[]> {
     return this.eventsUseCase.setlist(event.id);
   }
+
+  @ResolveField(() => Int, { description: "Músicas na lista do evento." })
+  async setlistCount(
+    @Parent() event: BandEvent,
+    @Context() context: object,
+  ): Promise<number> {
+    const count = await requestLoader(context, "setlist-counts", (ids) =>
+      this.eventsUseCase.setlistCounts(ids),
+    ).load(event.id);
+    return count ?? 0;
+  }
 }
 
 @Resolver(() => SetlistEntryType)
@@ -188,5 +250,15 @@ export class SetlistEntryFieldsResolver {
       const songs = await this.songsUseCase.findMany(ids);
       return new Map(songs.map((song) => [song.id, song]));
     }).load(entry.songId);
+  }
+}
+
+@Resolver(() => VenueType)
+export class VenueFieldsResolver {
+  @ResolveField(() => String, {
+    description: "Endereço numa linha (rua, número – bairro, cidade/UF, CEP).",
+  })
+  fullAddress(@Parent() venue: Venue): string {
+    return formatVenueAddress(venue);
   }
 }

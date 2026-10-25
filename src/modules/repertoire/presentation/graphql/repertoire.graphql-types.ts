@@ -14,15 +14,20 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   MaxLength,
 } from "class-validator";
 import { Paginated } from "@/common/graphql/pagination.graphql";
-import { SongCategory } from "@/modules/repertoire/domain/song";
+import { SongCategory, SongStage } from "@/modules/repertoire/domain/song";
 
 registerEnumType(SongCategory, {
   name: "SongCategory",
   description: "Categoria da música no repertório.",
+});
+registerEnumType(SongStage, {
+  name: "SongStage",
+  description: "NOVA: a banda ainda vai aprender; CONHECIDA: já toca.",
 });
 
 @ObjectType("Song")
@@ -33,11 +38,14 @@ export class SongType {
   @Field()
   title!: string;
 
-  @Field(() => String, {
+  @Field(() => ID, {
     nullable: true,
-    description: "Compositor ou intérprete.",
+    description: "Cantor / banda (ver o campo artist).",
   })
-  artist!: string | null;
+  artistId!: string | null;
+
+  @Field(() => SongStage)
+  stage!: SongStage;
 
   @Field(() => String, { nullable: true })
   arranger!: string | null;
@@ -77,11 +85,27 @@ export const SongPage = Paginated(SongType, "SongPage");
 
 @InputType()
 export class SongFilterInput {
-  @Field({ nullable: true })
+  @Field({ nullable: true, description: "Parte do título ou do artista." })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   search?: string;
+
+  @Field({ nullable: true, description: "Título exato (sem caixa/acentos)." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  title?: string;
+
+  @Field(() => ID, { nullable: true })
+  @IsOptional()
+  @IsUUID()
+  artistId?: string;
+
+  @Field(() => SongStage, { nullable: true })
+  @IsOptional()
+  @IsEnum(SongStage)
+  stage?: SongStage;
 
   @Field(() => SongCategory, { nullable: true })
   @IsOptional()
@@ -109,11 +133,15 @@ export class SongInput {
   @Length(1, 160)
   title!: string;
 
-  @Field(() => String, { nullable: true })
+  @Field(() => ID, { nullable: true })
   @IsOptional()
-  @IsString()
-  @MaxLength(160)
-  artist?: string | null;
+  @IsUUID()
+  artistId?: string | null;
+
+  @Field(() => SongStage, { nullable: true, description: "Padrão: CONHECIDA." })
+  @IsOptional()
+  @IsEnum(SongStage)
+  stage?: SongStage | null;
 
   @Field(() => String, { nullable: true })
   @IsOptional()
@@ -159,4 +187,22 @@ export class SongInput {
   @IsString({ each: true })
   @MaxLength(30, { each: true })
   tags!: string[];
+}
+
+@ObjectType("LyricsResult", { description: "Letra encontrada para a música." })
+export class LyricsResultType {
+  @Field({ description: "Artista como o catálogo conhece." })
+  artist!: string;
+
+  @Field()
+  title!: string;
+
+  @Field()
+  lyrics!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Página da letra (crédito).",
+  })
+  sourceUrl!: string | null;
 }

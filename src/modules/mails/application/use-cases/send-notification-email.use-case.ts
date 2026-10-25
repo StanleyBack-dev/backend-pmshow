@@ -15,7 +15,7 @@ export type NotificationEmail = Omit<
   "ctaUrl" | "hasCalendar"
 > & {
   to: { email: string; name: string };
-  /** App path the button opens, e.g. /agenda/<id>. */
+  /** App path the button opens, e.g. /eventos/<id>. */
   link: string;
   tag: string;
   attachments?: MailAttachment[];

@@ -1,6 +1,7 @@
 import { ParseUUIDPipe } from "@nestjs/common";
 import {
   Args,
+  Context,
   ID,
   Mutation,
   Parent,
@@ -10,12 +11,14 @@ import {
 } from "@nestjs/graphql";
 import type { AuthenticatedUser } from "@/common/auth/authenticated-user";
 import { CurrentUser } from "@/common/decorators/current-user.decorator";
+import { requestLoader } from "@/common/graphql/request-loader";
 import { Permission } from "@/modules/access-control/domain/permission";
 import { RequirePermissions } from "@/modules/access-control/presentation/decorators/require-permissions.decorator";
 import {
   MediaUseCase,
   type AudioUploadTicket,
 } from "@/modules/media/application/media.use-cases";
+import type { YoutubeSearchResult } from "@/modules/media/application/ports/media.ports";
 import type { MediaAsset } from "@/modules/media/domain/media";
 import {
   AddYoutubeVideoInput,
@@ -23,6 +26,7 @@ import {
   ConfirmAudioUploadInput,
   MediaAssetType,
   RequestAudioUploadInput,
+  YoutubeSearchResultType,
 } from "@/modules/media/presentation/graphql/media.graphql-types";
 import type { Song } from "@/modules/repertoire/domain/song";
 import { SongType } from "@/modules/repertoire/presentation/graphql/repertoire.graphql-types";
@@ -32,6 +36,14 @@ const Id = () => new ParseUUIDPipe({ version: "4" });
 @Resolver()
 export class MediaResolver {
   constructor(private readonly media: MediaUseCase) {}
+
+  @RequirePermissions(Permission.REPERTOIRE_MANAGE)
+  @Query(() => [YoutubeSearchResultType], {
+    description: "Busca vídeos no YouTube para o cadastro de música.",
+  })
+  searchYoutube(@Args("query") query: string): Promise<YoutubeSearchResult[]> {
+    return this.media.searchYoutube(query);
+  }
 
   @RequirePermissions(Permission.REPERTOIRE_READ)
   @Query(() => String, {
@@ -125,7 +137,13 @@ export class SongMediaResolver {
   @ResolveField(() => [MediaAssetType], {
     description: "Áudios e vídeos prontos desta música.",
   })
-  media(@Parent() song: Song): Promise<MediaAsset[]> {
-    return this.mediaUseCase.listReady(song.id);
+  media(
+    @Parent() song: Song,
+    @Context() context: object,
+  ): Promise<MediaAsset[] | null> {
+    // One query for every song of a list page.
+    return requestLoader(context, "song-media", (ids) =>
+      this.mediaUseCase.listReadyBySong(ids),
+    ).load(song.id);
   }
 }

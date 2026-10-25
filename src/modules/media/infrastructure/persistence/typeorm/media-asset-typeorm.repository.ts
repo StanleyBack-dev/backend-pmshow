@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomUUID } from "crypto";
-import { LessThan, type Repository } from "typeorm";
+import { In, LessThan, type Repository } from "typeorm";
 import type {
   MediaAssetRepositoryPort,
   NewMediaAsset,
@@ -40,6 +40,18 @@ export class MediaAssetTypeormRepository implements MediaAssetRepositoryPort {
     const rows = await this.repository.find({
       where: { songId, status },
       // Audio before video, then in the order they were added.
+      order: { kind: "ASC", createdAt: "ASC" },
+    });
+    return rows.map(toAsset);
+  }
+
+  async listBySongs(
+    songIds: readonly string[],
+    status: MediaStatus,
+  ): Promise<MediaAsset[]> {
+    if (songIds.length === 0) return [];
+    const rows = await this.repository.find({
+      where: { songId: In([...songIds]), status },
       order: { kind: "ASC", createdAt: "ASC" },
     });
     return rows.map(toAsset);

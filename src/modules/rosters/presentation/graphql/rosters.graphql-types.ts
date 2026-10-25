@@ -27,6 +27,17 @@ import {
 } from "@/modules/rosters/domain/roster";
 
 registerEnumType(RosterStatus, { name: "RosterStatus" });
+
+@ObjectType("RosterSummary", {
+  description: "Situação e tamanho da escala (listas de eventos).",
+})
+export class RosterSummaryType {
+  @Field(() => RosterStatus)
+  status!: RosterStatus;
+
+  @Field(() => Int, { description: "Pessoas escaladas." })
+  assignments!: number;
+}
 registerEnumType(AssignmentRole, {
   name: "AssignmentRole",
   description: "Função na escala.",

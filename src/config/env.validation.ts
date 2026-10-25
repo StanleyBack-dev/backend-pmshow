@@ -75,6 +75,12 @@ export const envValidationSchema = Joi.object({
 
   MEDIA_MAX_AUDIO_MB: Joi.number().integer().min(1).max(200).default(50),
 
+  // === SONG LOOKUP (song form) ===
+  // YouTube Data API v3 key (video search) and Vagalume key (lyrics). Each
+  // feature is simply off while its key is empty.
+  YOUTUBE_API_KEY: Joi.string().allow("").optional(),
+  VAGALUME_API_KEY: Joi.string().allow("").optional(),
+
   // === WEB PUSH (VAPID; generate with `npm run push:vapid`) ===
   // Without the keys the API still boots; devices just can't subscribe.
   VAPID_PUBLIC_KEY: Joi.string().allow("").optional(),

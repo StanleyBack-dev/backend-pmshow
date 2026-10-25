@@ -27,7 +27,7 @@ export type Notification = {
   type: NotificationType;
   title: string;
   body: string;
-  /** App path, e.g. /agenda/<id>. */
+  /** App path, e.g. /eventos/<id>. */
   link: string | null;
   readAt: Date | null;
   createdAt: Date;

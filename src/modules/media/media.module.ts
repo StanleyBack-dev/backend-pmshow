@@ -7,10 +7,12 @@ import {
   MEDIA_ASSET_REPOSITORY,
   OBJECT_STORAGE,
   YOUTUBE_METADATA,
+  YOUTUBE_SEARCH,
 } from "@/modules/media/application/ports/media.ports";
 import { MediaAssetTypeormRepository } from "@/modules/media/infrastructure/persistence/typeorm/media-asset-typeorm.repository";
 import { MediaAssetOrmEntity } from "@/modules/media/infrastructure/persistence/typeorm/media-asset.orm-entity";
 import { NeonObjectStorageAdapter } from "@/modules/media/infrastructure/storage/neon-object-storage.adapter";
+import { YoutubeDataApiAdapter } from "@/modules/media/infrastructure/youtube/youtube-data-api.adapter";
 import { YoutubeOEmbedAdapter } from "@/modules/media/infrastructure/youtube/youtube-oembed.adapter";
 import {
   MediaResolver,
@@ -36,6 +38,7 @@ import { RepertoireModule } from "@/modules/repertoire/repertoire.module";
     { provide: MEDIA_ASSET_REPOSITORY, useClass: MediaAssetTypeormRepository },
     { provide: OBJECT_STORAGE, useClass: NeonObjectStorageAdapter },
     { provide: YOUTUBE_METADATA, useClass: YoutubeOEmbedAdapter },
+    { provide: YOUTUBE_SEARCH, useClass: YoutubeDataApiAdapter },
   ],
 })
 export class MediaModule {}

@@ -17,6 +17,7 @@ import {
   AssignmentFieldsResolver,
   MyAssignmentFieldsResolver,
   RostersResolver,
+  EventRosterFieldResolver,
 } from "@/modules/rosters/presentation/graphql/rosters.resolver";
 import { InternalRostersController } from "@/modules/rosters/presentation/rest/internal-rosters.controller";
 
@@ -36,6 +37,7 @@ import { InternalRostersController } from "@/modules/rosters/presentation/rest/i
   providers: [
     RostersUseCase,
     RostersResolver,
+    EventRosterFieldResolver,
     AssignmentFieldsResolver,
     MyAssignmentFieldsResolver,
     { provide: ROSTER_REPOSITORY, useClass: RosterTypeormRepository },

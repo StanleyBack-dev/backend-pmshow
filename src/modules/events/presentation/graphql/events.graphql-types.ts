@@ -20,6 +20,7 @@ import {
   MaxLength,
   ValidateNested,
 } from "class-validator";
+import { Paginated } from "@/common/graphql/pagination.graphql";
 import { EventStatus, EventType } from "@/modules/events/domain/event";
 
 registerEnumType(EventType, {
@@ -27,6 +28,15 @@ registerEnumType(EventType, {
   description: "Tipo de apresentação ou compromisso.",
 });
 registerEnumType(EventStatus, { name: "EventStatus" });
+
+export enum EventPeriodGql {
+  UPCOMING = "UPCOMING",
+  PAST = "PAST",
+}
+registerEnumType(EventPeriodGql, {
+  name: "EventPeriod",
+  description: "Próximos (a partir de agora) ou passados.",
+});
 
 @ObjectType("Venue", { description: "Local de apresentação." })
 export class VenueType {
@@ -36,11 +46,26 @@ export class VenueType {
   @Field()
   name!: string;
 
+  @Field(() => String, { nullable: true, description: "CEP, 8 números." })
+  zipCode!: string | null;
+
+  @Field(() => String, { nullable: true, description: "Logradouro." })
+  street!: string | null;
+
+  @Field(() => String, { nullable: true, description: "Número ou S/N." })
+  number!: string | null;
+
   @Field(() => String, { nullable: true })
-  address!: string | null;
+  complement!: string | null;
+
+  @Field(() => String, { nullable: true, description: "Bairro." })
+  district!: string | null;
 
   @Field()
   city!: string;
+
+  @Field({ description: "UF." })
+  state!: string;
 
   @Field(() => String, { nullable: true })
   mapsUrl!: string | null;
@@ -137,6 +162,33 @@ export class EventFilterInput {
 }
 
 @InputType()
+export class EventPageFilterInput {
+  @Field({ nullable: true, description: "Parte do título (sem acento)." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  search?: string;
+
+  @Field(() => EventType, { nullable: true })
+  @IsOptional()
+  @IsEnum(EventType)
+  type?: EventType;
+
+  @Field(() => [EventStatus], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(EventStatus, { each: true })
+  statuses?: EventStatus[];
+
+  @Field(() => EventPeriodGql, { nullable: true })
+  @IsOptional()
+  @IsEnum(EventPeriodGql)
+  period?: EventPeriodGql;
+}
+
+export const EventPage = Paginated(EventGqlType, "EventPage");
+
+@InputType()
 export class EventInput {
   @Field()
   @IsString()
@@ -221,17 +273,47 @@ export class VenueInput {
   @Length(2, 120)
   name!: string;
 
+  @Field(() => String, { nullable: true, description: "CEP (8 números)." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(9)
+  zipCode?: string | null;
+
+  @Field(() => String, { nullable: true, description: "Logradouro." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  street?: string | null;
+
+  @Field(() => String, { nullable: true, description: "Número ou S/N." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  number?: string | null;
+
   @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
-  @MaxLength(255)
-  address?: string | null;
+  @MaxLength(80)
+  complement?: string | null;
+
+  @Field(() => String, { nullable: true, description: "Bairro." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  district?: string | null;
 
   @Field(() => String, { nullable: true, description: "Padrão: Goiânia." })
   @IsOptional()
   @IsString()
   @MaxLength(80)
   city?: string | null;
+
+  @Field(() => String, { nullable: true, description: "UF. Padrão: GO." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  state?: string | null;
 
   @Field(() => String, { nullable: true })
   @IsOptional()
@@ -249,4 +331,38 @@ export class VenueInput {
   @IsOptional()
   @IsBoolean()
   archived?: boolean;
+}
+
+export const VenuePage = Paginated(VenueType, "VenuePage");
+
+@InputType()
+export class VenueFilterInput {
+  @Field({ nullable: true, description: "Nome, rua, bairro ou cidade." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  search?: string;
+
+  @Field({ nullable: true, description: "Arquivados (padrão: ativos)." })
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
+}
+
+@ObjectType("ZipCodeAddress", { description: "Endereço de um CEP." })
+export class ZipCodeAddressType {
+  @Field()
+  zipCode!: string;
+
+  @Field(() => String, { nullable: true })
+  street!: string | null;
+
+  @Field(() => String, { nullable: true })
+  district!: string | null;
+
+  @Field()
+  city!: string;
+
+  @Field()
+  state!: string;
 }

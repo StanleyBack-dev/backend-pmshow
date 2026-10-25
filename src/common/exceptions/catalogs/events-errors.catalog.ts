@@ -27,6 +27,21 @@ export const eventsErrors = {
     status: HttpStatus.NOT_FOUND,
     message: "Local não encontrado ou arquivado.",
   },
+  invalidZipCode: {
+    code: "VENUE_INVALID_ZIP_CODE",
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: "O CEP deve ter 8 números (ex.: 74000-000).",
+  },
+  invalidAddressNumber: {
+    code: "VENUE_INVALID_ADDRESS_NUMBER",
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: "Número inválido. Use só números (ex.: 123 ou 12A) ou S/N.",
+  },
+  invalidState: {
+    code: "VENUE_INVALID_STATE",
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: "Informe a UF com 2 letras (ex.: GO).",
+  },
   invalidMapsUrl: {
     code: "VENUE_INVALID_MAPS_URL",
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -36,11 +51,11 @@ export const eventsErrors = {
   setlistUnknownSong: {
     code: "EVENT_SETLIST_UNKNOWN_SONG",
     status: HttpStatus.UNPROCESSABLE_ENTITY,
-    message: "Uma das músicas do setlist não existe ou está arquivada.",
+    message: "Uma das músicas da lista não existe ou está arquivada.",
   },
   setlistTooLong: {
     code: "EVENT_SETLIST_TOO_LONG",
     status: HttpStatus.UNPROCESSABLE_ENTITY,
-    message: "O setlist pode ter no máximo 80 músicas.",
+    message: "A lista de músicas pode ter no máximo 80 músicas.",
   },
 } as const;

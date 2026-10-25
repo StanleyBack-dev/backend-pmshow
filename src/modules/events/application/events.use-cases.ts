@@ -11,6 +11,7 @@ import {
   type EventFilter,
   type EventRepositoryPort,
   type VenueRepositoryPort,
+  type EventPageFilter,
 } from "@/modules/events/application/ports/events.ports";
 import {
   checkSchedule,
@@ -73,6 +74,8 @@ const snapshot = (event: BandEvent) => ({
   venueId: event.venueId,
 });
 
+import type { PageRequest, Paginated } from "@/shared/application/pagination";
+
 @Injectable()
 export class EventsUseCase {
   constructor(
@@ -83,6 +86,18 @@ export class EventsUseCase {
     private readonly audit: AuditTrailService,
     private readonly outbox: OutboxDispatcher,
   ) {}
+
+  /** The events page (period relative to now). */
+  page(
+    filter: Omit<EventPageFilter, "now">,
+    page: PageRequest,
+  ): Promise<Paginated<BandEvent>> {
+    return this.events.page({ ...filter, now: this.clock.now() }, page);
+  }
+
+  setlistCounts(eventIds: readonly string[]): Promise<Map<string, number>> {
+    return this.events.countSetlists(eventIds);
+  }
 
   list(filter: EventFilter): Promise<BandEvent[]> {
     return this.events.list(filter, MAX_EVENTS_PER_QUERY);
