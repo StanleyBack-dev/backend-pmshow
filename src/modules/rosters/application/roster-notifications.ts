@@ -1,4 +1,5 @@
 import type { NotificationDelivery } from "@/modules/notifications/application/notification-delivery";
+import { UNIFORM_LABELS } from "@/modules/events/domain/event";
 import { formatVenueAddress } from "@/modules/events/domain/venue-address";
 import { NotificationType } from "@/modules/notifications/domain/notification";
 import type { BandEvent, Venue } from "@/modules/events/domain/event";
@@ -124,7 +125,9 @@ export function rosterNotice(
       ? [{ label: "Término", value: formatTime(event.endsAt, timeZone) }]
       : []),
     ...(where ? [{ label: "Local", value: where }] : []),
-    ...(event.uniform ? [{ label: "Uniforme", value: event.uniform }] : []),
+    ...(event.uniform
+      ? [{ label: "Uniforme", value: UNIFORM_LABELS[event.uniform] }]
+      : []),
     ...(role && !removedFromCalendar
       ? [{ label: "Sua função", value: role }]
       : []),
@@ -165,7 +168,9 @@ export function rosterNotice(
           description:
             [
               role ? `Função: ${role}` : null,
-              event.uniform ? `Uniforme: ${event.uniform}` : null,
+              event.uniform
+                ? `Uniforme: ${UNIFORM_LABELS[event.uniform]}`
+                : null,
             ]
               .filter(Boolean)
               .join("\n") || null,

@@ -22,6 +22,7 @@ import {
   type EventType,
   type SetlistItem,
   type StatusDenial,
+  EventUniform,
 } from "@/modules/events/domain/event";
 import { OutboxDispatcher } from "@/modules/outbox/application/outbox-dispatcher.service";
 import { SongsUseCase } from "@/modules/repertoire/application/songs.use-cases";
@@ -33,8 +34,8 @@ export type EventInput = {
   callTime?: Date | null;
   startsAt: Date;
   endsAt?: Date | null;
-  venueId?: string | null;
-  uniform?: string | null;
+  venueId: string;
+  uniform: EventUniform;
   requester?: string | null;
   documentRef?: string | null;
   notes?: string | null;
@@ -251,18 +252,16 @@ export class EventsUseCase {
     if (checkSchedule(schedule).length > 0) {
       throw AppException.from(APP_ERRORS.events.invalidSchedule, undefined);
     }
-    if (input.venueId) {
-      const venue = await this.venues.findById(input.venueId);
-      if (!venue || venue.archived) {
-        throw AppException.from(APP_ERRORS.events.venueNotFound, undefined);
-      }
+    const venue = await this.venues.findById(input.venueId);
+    if (!venue || venue.archived) {
+      throw AppException.from(APP_ERRORS.events.venueNotFound, undefined);
     }
     return {
       title: input.title.trim().replace(/\s+/g, " "),
       type: input.type,
       ...schedule,
-      venueId: input.venueId ?? null,
-      uniform: text(input.uniform),
+      venueId: input.venueId,
+      uniform: input.uniform,
       requester: text(input.requester),
       documentRef: text(input.documentRef),
       notes: text(input.notes),

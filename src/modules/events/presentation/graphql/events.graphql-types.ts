@@ -21,13 +21,21 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Paginated } from "@/common/graphql/pagination.graphql";
-import { EventStatus, EventType } from "@/modules/events/domain/event";
+import {
+  EventStatus,
+  EventType,
+  EventUniform,
+} from "@/modules/events/domain/event";
 
 registerEnumType(EventType, {
   name: "EventType",
   description: "Tipo de apresentação ou compromisso.",
 });
 registerEnumType(EventStatus, { name: "EventStatus" });
+registerEnumType(EventUniform, {
+  name: "EventUniform",
+  description: "Uniforme da PMGO (ou paisano, sem uniforme).",
+});
 
 export enum EventPeriodGql {
   UPCOMING = "UPCOMING",
@@ -100,11 +108,17 @@ export class EventGqlType {
   @Field(() => Date, { nullable: true })
   endsAt!: Date | null;
 
-  @Field(() => ID, { nullable: true })
+  @Field(() => ID, {
+    nullable: true,
+    description: "null só em eventos anteriores ao local obrigatório.",
+  })
   venueId!: string | null;
 
-  @Field(() => String, { nullable: true, description: "Uniforme / traje." })
-  uniform!: string | null;
+  @Field(() => EventUniform, {
+    nullable: true,
+    description: "null só em eventos anteriores à lista de uniformes.",
+  })
+  uniform!: EventUniform | null;
 
   @Field(() => String, { nullable: true, description: "Quem solicitou." })
   requester!: string | null;
@@ -213,16 +227,13 @@ export class EventInput {
   @IsDate()
   endsAt?: Date | null;
 
-  @Field(() => ID, { nullable: true })
-  @IsOptional()
+  @Field(() => ID)
   @IsUUID()
-  venueId?: string | null;
+  venueId!: string;
 
-  @Field(() => String, { nullable: true })
-  @IsOptional()
-  @IsString()
-  @MaxLength(160)
-  uniform?: string | null;
+  @Field(() => EventUniform)
+  @IsEnum(EventUniform)
+  uniform!: EventUniform;
 
   @Field(() => String, { nullable: true })
   @IsOptional()

@@ -7,7 +7,11 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
-import { EventStatus, EventType } from "@/modules/events/domain/event";
+import {
+  EventStatus,
+  EventType,
+  EventUniform,
+} from "@/modules/events/domain/event";
 
 @Entity("tb_venues")
 export class VenueOrmEntity {
@@ -77,7 +81,7 @@ export class EventOrmEntity {
   venueId!: string | null;
 
   @Column({ type: "varchar", length: 160, nullable: true })
-  uniform!: string | null;
+  uniform!: EventUniform | null;
 
   @Column({ type: "varchar", length: 160, nullable: true })
   requester!: string | null;

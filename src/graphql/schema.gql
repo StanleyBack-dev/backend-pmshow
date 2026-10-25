@@ -190,10 +190,12 @@ type Event {
   callTime: DateTime
   startsAt: DateTime!
   endsAt: DateTime
+
+  """null só em eventos anteriores ao local obrigatório."""
   venueId: ID
 
-  """Uniforme / traje."""
-  uniform: String
+  """null só em eventos anteriores à lista de uniformes."""
+  uniform: EventUniform
 
   """Quem solicitou."""
   requester: String
@@ -219,6 +221,7 @@ enum EventType {
   SHOW
   DESFILE
   SOLENIDADE
+  BAILE
   FORMATURA
   ENSAIO
   CULTO_MISSA
@@ -230,6 +233,16 @@ enum EventStatus {
   CONFIRMADO
   REALIZADO
   CANCELADO
+}
+
+"""Uniforme da PMGO (ou paisano, sem uniforme)."""
+enum EventUniform {
+  OPERACIONAL_4A
+  OPERACIONAL_4B
+  OPERACIONAL_4C
+  TUNICA
+  SOCIAL
+  PAISANO
 }
 
 type SetlistEntry {
@@ -1081,8 +1094,8 @@ input EventInput {
   callTime: DateTime
   startsAt: DateTime!
   endsAt: DateTime
-  venueId: ID
-  uniform: String
+  venueId: ID!
+  uniform: EventUniform!
   requester: String
   documentRef: String
   notes: String
