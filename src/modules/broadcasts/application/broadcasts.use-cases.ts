@@ -136,7 +136,7 @@ export class BroadcastsUseCase {
         await this.events.get(eventId);
         return {
           userIds: await this.rosters.publishedAssignees(eventId),
-          link: `/agenda/${eventId}`,
+          link: `/eventos/${eventId}`,
         };
       }
     }

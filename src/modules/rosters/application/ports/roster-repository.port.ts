@@ -19,8 +19,12 @@ export type RosterState = {
   assignments: Assignment[];
 };
 
+/** Status and size of an event's roster (lists of events). */
+export type RosterSummary = { status: RosterStatus; assignments: number };
+
 export interface RosterRepositoryPort {
   find(eventId: string): Promise<Roster | null>;
+  summaries(eventIds: readonly string[]): Promise<Map<string, RosterSummary>>;
   /**
    * Creates or replaces the roster and its assignments, and stores the
    * notifications, in one transaction.

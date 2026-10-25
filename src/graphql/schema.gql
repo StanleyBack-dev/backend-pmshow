@@ -2,6 +2,38 @@
 # GENERATED FILE (npm run schema:generate) — do not edit
 # ------------------------------------------------------
 
+"""Cantor, banda ou artista."""
+type Artist {
+  id: ID!
+  name: String!
+  archived: Boolean!
+  createdAt: DateTime!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""Linha da página de cantores e bandas."""
+type ArtistListItem {
+  id: ID!
+  name: String!
+  archived: Boolean!
+  createdAt: DateTime!
+
+  """Músicas no repertório (não arquivadas)."""
+  songCount: Int!
+}
+
+type ArtistPage {
+  items: [ArtistListItem!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
 type AuditEntry {
   id: ID!
   actorId: ID
@@ -19,11 +51,6 @@ type AuditEntry {
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
 """
 scalar JSON
-
-"""
-A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
-"""
-scalar DateTime
 
 type AuditEntryPage {
   items: [AuditEntry!]!
@@ -127,11 +154,29 @@ type BandDashboard {
 type Venue {
   id: ID!
   name: String!
-  address: String
+
+  """CEP, 8 números."""
+  zipCode: String
+
+  """Logradouro."""
+  street: String
+
+  """Número ou S/N."""
+  number: String
+  complement: String
+
+  """Bairro."""
+  district: String
   city: String!
+
+  """UF."""
+  state: String!
   mapsUrl: String
   notes: String
   archived: Boolean!
+
+  """Endereço numa linha (rua, número – bairro, cidade/UF, CEP)."""
+  fullAddress: String!
 }
 
 """Apresentação, desfile, ensaio…"""
@@ -161,6 +206,12 @@ type Event {
   updatedAt: DateTime!
   venue: Venue
   setlist: [SetlistEntry!]!
+
+  """Músicas na lista do evento."""
+  setlistCount: Int!
+
+  """Escala do evento (null: sem escala ou sem permissão)."""
+  rosterSummary: RosterSummary
 }
 
 """Tipo de apresentação ou compromisso."""
@@ -190,12 +241,38 @@ type SetlistEntry {
   song: Song
 }
 
+type EventPage {
+  items: [Event!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+type VenuePage {
+  items: [Venue!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+"""Endereço de um CEP."""
+type ZipCodeAddress {
+  zipCode: String!
+  street: String
+  district: String
+  city: String!
+  state: String!
+}
+
 type Song {
   id: ID!
   title: String!
 
-  """Compositor ou intérprete."""
-  artist: String
+  """Cantor / banda (ver o campo artist)."""
+  artistId: ID
+  stage: SongStage!
   arranger: String
   category: SongCategory!
 
@@ -212,6 +289,13 @@ type Song {
 
   """Áudios e vídeos prontos desta música."""
   media: [MediaAsset!]!
+  artist: Artist
+}
+
+"""NOVA: a banda ainda vai aprender; CONHECIDA: já toca."""
+enum SongStage {
+  NOVA
+  CONHECIDA
 }
 
 """Categoria da música no repertório."""
@@ -236,6 +320,17 @@ type SongPage {
   page: Int!
   limit: Int!
   totalPages: Int!
+}
+
+"""Letra encontrada para a música."""
+type LyricsResult {
+  """Artista como o catálogo conhece."""
+  artist: String!
+  title: String!
+  lyrics: String!
+
+  """Página da letra (crédito)."""
+  sourceUrl: String
 }
 
 type PermissionOverride {
@@ -397,6 +492,20 @@ type AudioUploadTicket {
   upload: UploadForm!
 }
 
+"""Vídeo encontrado no YouTube."""
+type YoutubeSearchResult {
+  videoId: String!
+  title: String!
+
+  """Canal que publicou."""
+  channelTitle: String!
+  thumbnailUrl: String!
+  publishedAt: String
+
+  """Duração em segundos."""
+  durationSeconds: Int
+}
+
 type Instrument {
   id: ID!
   name: String!
@@ -514,6 +623,19 @@ type NotificationPreference {
   emailEnabled: Boolean!
 }
 
+"""Situação e tamanho da escala (listas de eventos)."""
+type RosterSummary {
+  status: RosterStatus!
+
+  """Pessoas escaladas."""
+  assignments: Int!
+}
+
+enum RosterStatus {
+  RASCUNHO
+  PUBLICADA
+}
+
 """Uma pessoa na escala."""
 type Assignment {
   userId: ID!
@@ -559,11 +681,6 @@ type Roster {
 
   """Naipes com músicos ativos e ninguém escalado."""
   uncoveredSections: [Section!]!
-}
-
-enum RosterStatus {
-  RASCUNHO
-  PUBLICADA
 }
 
 """Minha participação numa escala publicada."""
@@ -640,6 +757,12 @@ type Query {
   """Verifica se a API GraphQL responde."""
   ping: String!
 
+  """Página de cantores e bandas, com filtros."""
+  artistsPage(filter: ArtistFilterInput, page: PageInput): ArtistPage!
+
+  """Em ordem alfabética."""
+  artists(includeArchived: Boolean! = false): [Artist!]!
+
   """Trilha de auditoria, da mais recente para a mais antiga."""
   auditLogs(filter: AuditFilterInput, page: PageInput): AuditEntryPage!
   myAbsences: [Absence!]!
@@ -654,14 +777,26 @@ type Query {
   """Eventos por período (ordenados pelo início, até 500)."""
   events(filter: EventFilterInput): [Event!]!
 
+  """Página de eventos: busca, tipo, situação e período."""
+  eventsPage(filter: EventPageFilterInput, page: PageInput): EventPage!
+
   """Próximos eventos planejados ou confirmados."""
   upcomingEvents(limit: Int! = 5): [Event!]!
   event(id: ID!): Event!
+
+  """Página de locais, com busca."""
+  venuesPage(filter: VenueFilterInput, page: PageInput): VenuePage!
+
+  """Endereço de um CEP (ViaCEP); null se não existir."""
+  zipCodeAddress(zipCode: String!): ZipCodeAddress
   venues(includeArchived: Boolean! = false): [Venue!]!
   me: SessionUser!
   users(filter: UserFilterInput, page: PageInput): UserAccountPage!
   user(id: ID!): UserAccount!
   userPermissions(id: ID!): PermissionMatrix!
+
+  """Busca vídeos no YouTube para o cadastro de música."""
+  searchYoutube(query: String!): [YoutubeSearchResult!]!
 
   """Link temporário para tocar o áudio (válido por pelo menos 1 hora)."""
   audioPlaybackUrl(assetId: ID!): String!
@@ -690,6 +825,12 @@ type Query {
   """Tags em uso no repertório."""
   songTags: [String!]!
 
+  """Títulos, para o filtro."""
+  songTitles(archived: Boolean! = false): [String!]!
+
+  """Letra completa num catálogo (null = não encontrada)."""
+  findLyrics(artist: String!, title: String!): LyricsResult
+
   """
   Escala do evento. Rascunhos só para quem vê todas; publicada para quem está nela.
   """
@@ -702,15 +843,26 @@ type Query {
   myAssignments: [MyAssignment!]!
 }
 
-input AuditFilterInput {
-  entity: String
-  entityId: String
-  actorId: ID
+input ArtistFilterInput {
+  """Parte do nome (sem acento)."""
+  search: String
+
+  """Arquivados (só gestão)."""
+  archived: Boolean
+
+  """true: só com músicas; false: só sem músicas."""
+  withSongs: Boolean
 }
 
 input PageInput {
   page: Int! = 1
   limit: Int! = 20
+}
+
+input AuditFilterInput {
+  entity: String
+  entityId: String
+  actorId: ID
 }
 
 input AbsenceFilterInput {
@@ -734,6 +886,28 @@ input EventFilterInput {
   type: EventType
 }
 
+input EventPageFilterInput {
+  """Parte do título (sem acento)."""
+  search: String
+  type: EventType
+  statuses: [EventStatus!]
+  period: EventPeriod
+}
+
+"""Próximos (a partir de agora) ou passados."""
+enum EventPeriod {
+  UPCOMING
+  PAST
+}
+
+input VenueFilterInput {
+  """Nome, rua, bairro ou cidade."""
+  search: String
+
+  """Arquivados (padrão: ativos)."""
+  archived: Boolean
+}
+
 input UserFilterInput {
   search: String
   group: UserGroup
@@ -751,7 +925,13 @@ input RosterFilterInput {
 }
 
 input SongFilterInput {
+  """Parte do título ou do artista."""
   search: String
+
+  """Título exato (sem caixa/acentos)."""
+  title: String
+  artistId: ID
+  stage: SongStage
   category: SongCategory
   tag: String
 
@@ -760,6 +940,9 @@ input SongFilterInput {
 }
 
 type Mutation {
+  createArtist(input: ArtistInput!): Artist!
+  updateArtist(id: ID!, input: ArtistInput!): Artist!
+
   """Pede para si (pendente)."""
   requestAbsence(input: AbsenceInput!): Absence!
 
@@ -774,7 +957,7 @@ type Mutation {
   """Confirma, cancela (com motivo), reabre ou marca como realizado."""
   changeEventStatus(id: ID!, status: EventStatus!, reason: String): Event!
 
-  """Substitui o setlist do evento pela lista, na ordem dada."""
+  """Substitui a lista de músicas do evento, na ordem dada."""
   setEventSetlist(id: ID!, input: SetlistInput!): [SetlistEntry!]!
   createVenue(input: VenueInput!): Venue!
   updateVenue(id: ID!, input: VenueInput!): Venue!
@@ -863,6 +1046,13 @@ type Mutation {
   acknowledgeRoster(eventId: ID!, answer: AckAnswer!, note: String): Assignment!
 }
 
+input ArtistInput {
+  name: String!
+
+  """Só na edição."""
+  archived: Boolean
+}
+
 input AbsenceInput {
   type: AbsenceType!
 
@@ -909,10 +1099,25 @@ input SetlistItemInput {
 
 input VenueInput {
   name: String!
-  address: String
+
+  """CEP (8 números)."""
+  zipCode: String
+
+  """Logradouro."""
+  street: String
+
+  """Número ou S/N."""
+  number: String
+  complement: String
+
+  """Bairro."""
+  district: String
 
   """Padrão: Goiânia."""
   city: String
+
+  """UF. Padrão: GO."""
+  state: String
   mapsUrl: String
   notes: String
   archived: Boolean
@@ -1036,7 +1241,10 @@ input PushSubscriptionInput {
 
 input SongInput {
   title: String!
-  artist: String
+  artistId: ID
+
+  """Padrão: CONHECIDA."""
+  stage: SongStage
   arranger: String
   category: SongCategory!
   musicalKey: String

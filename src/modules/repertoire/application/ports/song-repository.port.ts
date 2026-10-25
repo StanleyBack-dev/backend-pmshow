@@ -1,9 +1,17 @@
-import type { Song, SongCategory } from "@/modules/repertoire/domain/song";
+import type {
+  Song,
+  SongCategory,
+  SongStage,
+} from "@/modules/repertoire/domain/song";
 import type { PageRequest, Paginated } from "@/shared/application/pagination";
 
 export type SongFilter = {
-  /** Title or artist (case- and accent-insensitive). */
+  /** Part of the title or the artist's name (case- and accent-insensitive). */
   search?: string;
+  /** Exact title, ignoring case and accents (the title filter). */
+  title?: string;
+  artistId?: string;
+  stage?: SongStage;
   category?: SongCategory;
   tag?: string;
   archived: boolean;
@@ -23,6 +31,8 @@ export interface SongRepositoryPort {
   setArchived(id: string, archivedAt: Date | null): Promise<Song>;
   /** Every tag in use, for the filter. */
   listTags(): Promise<string[]>;
+  /** Distinct titles, for the title filter. */
+  listTitles(archived: boolean): Promise<string[]>;
 }
 
 export const SONG_REPOSITORY = Symbol("SONG_REPOSITORY");

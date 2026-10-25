@@ -4,8 +4,10 @@ import { In, type DataSource, type Repository } from "typeorm";
 import type {
   EventData,
   EventFilter,
+  EventPageFilter,
   EventRepositoryPort,
   VenueData,
+  VenueFilter,
   VenueRepositoryPort,
 } from "@/modules/events/application/ports/events.ports";
 import {
@@ -21,6 +23,13 @@ import {
 } from "@/modules/events/infrastructure/persistence/typeorm/event.orm-entity";
 import type { OutboxDraft } from "@/modules/outbox/domain/outbox";
 import { OutboxTypeormWriter } from "@/modules/outbox/infrastructure/persistence/typeorm/outbox-typeorm.repository";
+import {
+  paginate,
+  type PageRequest,
+  type Paginated,
+} from "@/shared/application/pagination";
+
+const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
 const toEvent = (row: EventOrmEntity): BandEvent => ({
   id: row.id,
@@ -43,8 +52,13 @@ const toEvent = (row: EventOrmEntity): BandEvent => ({
 const toVenue = (row: VenueOrmEntity): Venue => ({
   id: row.id,
   name: row.name,
-  address: row.address,
+  zipCode: row.zipCode,
+  street: row.street,
+  number: row.number,
+  complement: row.complement,
+  district: row.district,
   city: row.city,
+  state: row.state,
   mapsUrl: row.mapsUrl,
   notes: row.notes,
   archived: row.archived,
@@ -76,6 +90,57 @@ export class EventTypeormRepository implements EventRepositoryPort {
     }
     if (filter.type) query.andWhere("event.type = :type", filter);
     return (await query.getMany()).map(toEvent);
+  }
+
+  async page(
+    filter: EventPageFilter,
+    page: PageRequest,
+  ): Promise<Paginated<BandEvent>> {
+    const query = this.repository
+      .createQueryBuilder("event")
+      .skip((page.page - 1) * page.limit)
+      .take(page.limit);
+    if (filter.period === "UPCOMING") {
+      query
+        .where("event.starts_at >= :now", { now: filter.now })
+        .orderBy("event.startsAt", "ASC");
+    } else if (filter.period === "PAST") {
+      query
+        .where("event.starts_at < :now", { now: filter.now })
+        .orderBy("event.startsAt", "DESC");
+    } else {
+      query.orderBy("event.startsAt", "DESC");
+    }
+    const search = filter.search?.trim();
+    if (search) {
+      query.andWhere("unaccent(event.title) ILIKE unaccent(:term)", {
+        term: `%${escapeLike(search)}%`,
+      });
+    }
+    if (filter.statuses?.length) {
+      query.andWhere("event.status IN (:...statuses)", {
+        statuses: filter.statuses,
+      });
+    }
+    if (filter.type)
+      query.andWhere("event.type = :type", { type: filter.type });
+    const [rows, total] = await query.getManyAndCount();
+    return paginate(rows.map(toEvent), total, page);
+  }
+
+  async countSetlists(
+    eventIds: readonly string[],
+  ): Promise<Map<string, number>> {
+    if (eventIds.length === 0) return new Map();
+    const rows = await this.dataSource
+      .getRepository(EventSongOrmEntity)
+      .createQueryBuilder("item")
+      .select("item.idtb_events", "eventId")
+      .addSelect("count(*)::int", "total")
+      .where("item.idtb_events IN (:...ids)", { ids: [...eventIds] })
+      .groupBy("item.idtb_events")
+      .getRawMany<{ eventId: string; total: number }>();
+    return new Map(rows.map((row) => [row.eventId, Number(row.total)]));
   }
 
   async findById(id: string): Promise<BandEvent | null> {
@@ -162,6 +227,28 @@ export class VenueTypeormRepository implements VenueRepositoryPort {
       order: { name: "ASC" },
     });
     return rows.map(toVenue);
+  }
+
+  async page(
+    filter: VenueFilter,
+    page: PageRequest,
+  ): Promise<Paginated<Venue>> {
+    const query = this.repository
+      .createQueryBuilder("venue")
+      .where("venue.archived = :archived", { archived: filter.archived })
+      .orderBy("venue.name", "ASC")
+      .skip((page.page - 1) * page.limit)
+      .take(page.limit);
+    const search = filter.search?.trim();
+    if (search) {
+      query.andWhere(
+        `unaccent(concat_ws(' ', venue.name, venue.street, venue.district,
+           venue.city)) ILIKE unaccent(:term)`,
+        { term: `%${escapeLike(search)}%` },
+      );
+    }
+    const [rows, total] = await query.getManyAndCount();
+    return paginate(rows.map(toVenue), total, page);
   }
 
   async findById(id: string): Promise<Venue | null> {

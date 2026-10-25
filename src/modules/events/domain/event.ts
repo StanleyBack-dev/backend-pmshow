@@ -1,3 +1,5 @@
+import type { VenueAddress } from "@/modules/events/domain/venue-address";
+
 export enum EventType {
   SHOW = "SHOW",
   DESFILE = "DESFILE",
@@ -15,11 +17,9 @@ export enum EventStatus {
   CANCELADO = "CANCELADO",
 }
 
-export type Venue = {
+export type Venue = VenueAddress & {
   id: string;
   name: string;
-  address: string | null;
-  city: string;
   mapsUrl: string | null;
   notes: string | null;
   archived: boolean;

@@ -9,10 +9,13 @@ import {
   MEDIA_ASSET_REPOSITORY,
   OBJECT_STORAGE,
   YOUTUBE_METADATA,
+  YOUTUBE_SEARCH,
   type MediaAssetRepositoryPort,
   type ObjectStoragePort,
   type UploadForm,
   type YoutubeMetadataPort,
+  type YoutubeSearchPort,
+  type YoutubeSearchResult,
 } from "@/modules/media/application/ports/media.ports";
 import {
   audioExtension,
@@ -32,6 +35,8 @@ const STALE_PENDING_MS = 60 * 60 * 1000;
 
 export type AudioUploadTicket = { asset: MediaAsset; upload: UploadForm };
 
+const YOUTUBE_SEARCH_LIMIT = 10;
+
 @Injectable()
 export class MediaUseCase {
   private readonly logger = new Logger(MediaUseCase.name);
@@ -43,6 +48,7 @@ export class MediaUseCase {
     private readonly assets: MediaAssetRepositoryPort,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
     @Inject(YOUTUBE_METADATA) private readonly youtube: YoutubeMetadataPort,
+    @Inject(YOUTUBE_SEARCH) private readonly youtubeSearch: YoutubeSearchPort,
     @Inject(CLOCK) private readonly clock: ClockPort,
     private readonly songs: SongsUseCase,
     private readonly audit: AuditTrailService,
@@ -54,6 +60,29 @@ export class MediaUseCase {
 
   listReady(songId: string): Promise<MediaAsset[]> {
     return this.assets.listBySong(songId, MediaStatus.READY);
+  }
+
+  /** Ready media of many songs, grouped by song (list pages). */
+  async listReadyBySong(
+    songIds: readonly string[],
+  ): Promise<Map<string, MediaAsset[]>> {
+    const assets = await this.assets.listBySongs(songIds, MediaStatus.READY);
+    const bySong = new Map<string, MediaAsset[]>(songIds.map((id) => [id, []]));
+    for (const asset of assets) bySong.get(asset.songId)?.push(asset);
+    return bySong;
+  }
+
+  /** YouTube videos for the song form (embeddable only). */
+  searchYoutube(query: string): Promise<YoutubeSearchResult[]> {
+    if (!this.youtubeSearch.configured()) {
+      throw AppException.from(
+        APP_ERRORS.media.youtubeSearchNotConfigured,
+        undefined,
+      );
+    }
+    const term = query.trim().replace(/\s+/g, " ").slice(0, 120);
+    if (term.length < 2) return Promise.resolve([]);
+    return this.youtubeSearch.search(term, YOUTUBE_SEARCH_LIMIT);
   }
 
   // --- YouTube -----------------------------------------------------------
@@ -76,6 +105,10 @@ export class MediaUseCase {
     if (!info) {
       throw AppException.from(APP_ERRORS.media.youtubeUnavailable, undefined);
     }
+    // Duration needs the Data API key; without it the video is still added.
+    const durationSeconds = this.youtubeSearch.configured()
+      ? ((await this.youtubeSearch.durations([videoId])).get(videoId) ?? null)
+      : null;
 
     const asset = await this.assets.create({
       songId,
@@ -85,11 +118,12 @@ export class MediaUseCase {
       storageKey: null,
       mimeType: null,
       sizeBytes: null,
-      durationSeconds: null,
+      durationSeconds,
       youtubeVideoId: videoId,
       thumbnailUrl: info.thumbnailUrl,
       createdBy: actor.id,
     });
+    await this.songs.fillDurationIfMissing(songId, durationSeconds);
     await this.record(actor, "media.video_added", asset);
     return asset;
   }
@@ -172,6 +206,7 @@ export class MediaUseCase {
           ? Math.round(durationSeconds)
           : null,
     });
+    await this.songs.fillDurationIfMissing(ready.songId, ready.durationSeconds);
     await this.record(actor, "media.audio_uploaded", ready);
     return ready;
   }

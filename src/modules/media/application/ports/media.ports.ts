@@ -8,6 +8,11 @@ export type NewMediaAsset = Omit<MediaAsset, "id" | "createdAt"> & {
 
 export interface MediaAssetRepositoryPort {
   listBySong(songId: string, status: MediaStatus): Promise<MediaAsset[]>;
+  /** Same order as listBySong, for many songs at once. */
+  listBySongs(
+    songIds: readonly string[],
+    status: MediaStatus,
+  ): Promise<MediaAsset[]>;
   findById(id: string): Promise<MediaAsset | null>;
   findVideo(songId: string, youtubeVideoId: string): Promise<MediaAsset | null>;
   create(asset: NewMediaAsset): Promise<MediaAsset>;
@@ -68,3 +73,24 @@ export interface YoutubeMetadataPort {
 }
 
 export const YOUTUBE_METADATA = Symbol("YOUTUBE_METADATA");
+
+// --- YouTube search ------------------------------------------------------
+
+export type YoutubeSearchResult = {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string;
+  publishedAt: string | null;
+  durationSeconds: number | null;
+};
+
+export interface YoutubeSearchPort {
+  /** False when there is no API key (feature off). */
+  configured(): boolean;
+  search(query: string, limit: number): Promise<YoutubeSearchResult[]>;
+  /** Durations in seconds by video id (missing ids: unknown). */
+  durations(videoIds: readonly string[]): Promise<Map<string, number>>;
+}
+
+export const YOUTUBE_SEARCH = Symbol("YOUTUBE_SEARCH");

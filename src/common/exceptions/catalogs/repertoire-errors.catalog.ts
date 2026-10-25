@@ -16,6 +16,11 @@ export const repertoireErrors = {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     message: "Tonalidade inválida. Use, por exemplo, C, Bb, F#m.",
   },
+  artistRequired: {
+    code: "SONG_ARTIST_REQUIRED",
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: "Informe o cantor / banda da música.",
+  },
   invalidBpm: {
     code: "SONG_INVALID_BPM",
     status: HttpStatus.UNPROCESSABLE_ENTITY,

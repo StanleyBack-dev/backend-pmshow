@@ -17,7 +17,8 @@ import {
 const toSong = (row: SongOrmEntity): Song => ({
   id: row.id,
   title: row.title,
-  artist: row.artist,
+  artistId: row.artistId,
+  stage: row.stage,
   arranger: row.arranger,
   category: row.category,
   musicalKey: row.musicalKey,
@@ -43,6 +44,11 @@ export class SongTypeormRepository implements SongRepositoryPort {
   async list(filter: SongFilter, page: PageRequest): Promise<Paginated<Song>> {
     const query = this.repository
       .createQueryBuilder("song")
+      .leftJoin(
+        "tb_artists",
+        "artist",
+        "artist.idtb_artists = song.idtb_artists",
+      )
       .where(
         filter.archived
           ? "song.archived_at IS NOT NULL"
@@ -61,13 +67,22 @@ export class SongTypeormRepository implements SongRepositoryPort {
           where
             .where("unaccent(song.title) ILIKE unaccent(:term)", { term })
             .orWhere(
-              "unaccent(coalesce(song.artist, '')) ILIKE unaccent(:term)",
-              {
-                term,
-              },
+              "unaccent(coalesce(artist.name, '')) ILIKE unaccent(:term)",
+              { term },
             ),
         ),
       );
+    }
+    if (filter.title?.trim()) {
+      query.andWhere("lower(unaccent(song.title)) = lower(unaccent(:title))", {
+        title: filter.title.trim(),
+      });
+    }
+    if (filter.artistId) {
+      query.andWhere("song.idtb_artists = :artistId", filter);
+    }
+    if (filter.stage) {
+      query.andWhere("song.stage = :stage", filter);
     }
     if (filter.category) {
       query.andWhere("song.category = :category", filter);
@@ -106,6 +121,15 @@ export class SongTypeormRepository implements SongRepositoryPort {
   async setArchived(id: string, archivedAt: Date | null): Promise<Song> {
     await this.repository.update({ id }, { archivedAt });
     return toSong(await this.repository.findOneOrFail({ where: { id } }));
+  }
+
+  async listTitles(archived: boolean): Promise<string[]> {
+    const rows = await this.repository.query<{ title: string }[]>(
+      `SELECT DISTINCT ON (lower(unaccent(title))) title FROM tb_songs
+        WHERE ${archived ? "archived_at IS NOT NULL" : "archived_at IS NULL"}
+        ORDER BY lower(unaccent(title)), title`,
+    );
+    return rows.map((row) => row.title);
   }
 
   async listTags(): Promise<string[]> {

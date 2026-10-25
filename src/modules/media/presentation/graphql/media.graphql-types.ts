@@ -144,3 +144,26 @@ export class AddYoutubeVideoInput {
   @MaxLength(160)
   title?: string | null;
 }
+
+@ObjectType("YoutubeSearchResult", {
+  description: "Vídeo encontrado no YouTube.",
+})
+export class YoutubeSearchResultType {
+  @Field()
+  videoId!: string;
+
+  @Field()
+  title!: string;
+
+  @Field({ description: "Canal que publicou." })
+  channelTitle!: string;
+
+  @Field()
+  thumbnailUrl!: string;
+
+  @Field(() => String, { nullable: true })
+  publishedAt!: string | null;
+
+  @Field(() => Int, { nullable: true, description: "Duração em segundos." })
+  durationSeconds!: number | null;
+}

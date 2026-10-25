@@ -61,6 +61,18 @@ export const mediaErrors = {
     status: HttpStatus.BAD_GATEWAY,
     message: "Não foi possível consultar o YouTube agora. Tente novamente.",
   },
+  youtubeSearchNotConfigured: {
+    code: "MEDIA_YOUTUBE_SEARCH_NOT_CONFIGURED",
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    message:
+      "A busca no YouTube ainda não foi configurada no servidor (YOUTUBE_API_KEY).",
+  },
+  youtubeSearchFailed: {
+    code: "MEDIA_YOUTUBE_SEARCH_FAILED",
+    status: HttpStatus.BAD_GATEWAY,
+    message:
+      "Não foi possível buscar no YouTube agora (limite diário ou falha). Cole o link do vídeo ou tente mais tarde.",
+  },
   duplicateVideo: {
     code: "MEDIA_DUPLICATE_VIDEO",
     status: HttpStatus.CONFLICT,

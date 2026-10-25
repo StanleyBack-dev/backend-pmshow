@@ -8,11 +8,13 @@ import type {
   EventAssignment,
   RosterRepositoryPort,
   RosterState,
+  RosterSummary,
 } from "@/modules/rosters/application/ports/roster-repository.port";
 import type {
   AckStatus,
   Assignment,
   Roster,
+  RosterStatus,
   Window,
 } from "@/modules/rosters/domain/roster";
 import {
@@ -40,6 +42,34 @@ export class RosterTypeormRepository implements RosterRepositoryPort {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly outbox: OutboxTypeormWriter,
   ) {}
+
+  async summaries(
+    eventIds: readonly string[],
+  ): Promise<Map<string, RosterSummary>> {
+    if (eventIds.length === 0) return new Map();
+    const rows = await this.dataSource
+      .getRepository(RosterOrmEntity)
+      .createQueryBuilder("roster")
+      .select("roster.idtb_events", "eventId")
+      .addSelect("roster.status", "status")
+      .addSelect(
+        `(SELECT count(*)::int FROM tb_roster_assignments a
+           WHERE a.idtb_events = roster.idtb_events)`,
+        "assignments",
+      )
+      .where("roster.idtb_events IN (:...ids)", { ids: [...eventIds] })
+      .getRawMany<{
+        eventId: string;
+        status: RosterStatus;
+        assignments: number;
+      }>();
+    return new Map(
+      rows.map((row) => [
+        row.eventId,
+        { status: row.status, assignments: Number(row.assignments) },
+      ]),
+    );
+  }
 
   async find(eventId: string): Promise<Roster | null> {
     const roster = await this.dataSource

@@ -17,11 +17,26 @@ export class VenueOrmEntity {
   @Column({ type: "varchar", length: 120 })
   name!: string;
 
-  @Column({ type: "varchar", length: 255, nullable: true })
-  address!: string | null;
+  @Column({ name: "zip_code", type: "varchar", length: 8, nullable: true })
+  zipCode!: string | null;
+
+  @Column({ type: "varchar", length: 160, nullable: true })
+  street!: string | null;
+
+  @Column({ type: "varchar", length: 10, nullable: true })
+  number!: string | null;
+
+  @Column({ type: "varchar", length: 80, nullable: true })
+  complement!: string | null;
+
+  @Column({ type: "varchar", length: 80, nullable: true })
+  district!: string | null;
 
   @Column({ type: "varchar", length: 80 })
   city!: string;
+
+  @Column({ type: "varchar", length: 2, default: "GO" })
+  state!: string;
 
   @Column({ name: "maps_url", type: "varchar", length: 500, nullable: true })
   mapsUrl!: string | null;

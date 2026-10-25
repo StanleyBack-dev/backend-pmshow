@@ -22,7 +22,10 @@ import type { BandEvent } from "@/modules/events/domain/event";
 import { EventGqlType } from "@/modules/events/presentation/graphql/events.graphql-types";
 import { MembersUseCase } from "@/modules/members/application/use-cases/members.use-cases";
 import { Rank, Section } from "@/modules/members/domain/member";
-import type { EventAssignment } from "@/modules/rosters/application/ports/roster-repository.port";
+import type {
+  EventAssignment,
+  RosterSummary,
+} from "@/modules/rosters/application/ports/roster-repository.port";
 import {
   RostersUseCase,
   type Candidate,
@@ -36,6 +39,7 @@ import {
   RosterCandidateType,
   RosterInput,
   RosterType,
+  RosterSummaryType,
 } from "@/modules/rosters/presentation/graphql/rosters.graphql-types";
 
 const Id = () => new ParseUUIDPipe({ version: "4" });
@@ -237,4 +241,31 @@ function loadPerson(
       ]),
     );
   }).load(userId);
+}
+
+// The roster summary of each event in lists (eventsPage), batched per
+// request. Only for who sees every roster (drafts included).
+@Resolver(() => EventGqlType)
+export class EventRosterFieldResolver {
+  constructor(
+    private readonly rostersUseCase: RostersUseCase,
+    private readonly permissions: PermissionsService,
+  ) {}
+
+  @ResolveField(() => RosterSummaryType, {
+    nullable: true,
+    description: "Escala do evento (null: sem escala ou sem permissão).",
+  })
+  rosterSummary(
+    @Parent() event: BandEvent,
+    @CurrentUser() user: AuthenticatedUser,
+    @Context() context: object,
+  ): Promise<RosterSummary | null> {
+    return requestLoader(context, "roster-summaries", async (ids) => {
+      const granted = await this.permissions.effectiveFor(user);
+      return granted.has(Permission.ROSTERS_READ_ALL)
+        ? this.rostersUseCase.summaries(ids)
+        : new Map<string, RosterSummary>();
+    }).load(event.id);
+  }
 }

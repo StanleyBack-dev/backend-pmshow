@@ -1,4 +1,5 @@
 import {
+  normalizeSongTitle,
   BPM_RANGE,
   inRange,
   normalizeMusicalKey,
@@ -42,5 +43,13 @@ describe("inRange", () => {
     expect(inRange(120, BPM_RANGE)).toBe(true);
     expect(inRange(19, BPM_RANGE)).toBe(false);
     expect(inRange(120.5, BPM_RANGE)).toBe(false);
+  });
+});
+
+describe("normalizeSongTitle", () => {
+  it("trims, collapses spaces and stores in lowercase", () => {
+    expect(normalizeSongTitle("  RECAÍDAS   Ao Vivo ")).toBe(
+      "recaídas ao vivo",
+    );
   });
 });

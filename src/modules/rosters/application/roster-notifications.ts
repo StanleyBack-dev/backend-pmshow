@@ -1,4 +1,5 @@
 import type { NotificationDelivery } from "@/modules/notifications/application/notification-delivery";
+import { formatVenueAddress } from "@/modules/events/domain/venue-address";
 import { NotificationType } from "@/modules/notifications/domain/notification";
 import type { BandEvent, Venue } from "@/modules/events/domain/event";
 import type { AssignmentRole } from "@/modules/rosters/domain/roster";
@@ -91,9 +92,7 @@ const isReminder = (kind: NoticeKind) =>
   kind === "reminder-tomorrow" || kind === "reminder-today";
 
 const venueText = (venue: Venue | null) =>
-  venue
-    ? [venue.name, venue.address, venue.city].filter(Boolean).join(" — ")
-    : null;
+  venue ? `${venue.name} — ${formatVenueAddress(venue)}` : null;
 
 const roleText = (line: NoticeLine) =>
   line
@@ -145,7 +144,7 @@ export function rosterNotice(
     ]
       .filter(Boolean)
       .join(" · "),
-    link: `/agenda/${event.id}`,
+    link: `/eventos/${event.id}`,
     email: {
       subject: `${meta.subject}: ${event.title}`,
       intro: meta.intro,
@@ -187,7 +186,7 @@ export function swapRequestNotice(
     type: NotificationType.ROSTER_SWAP_REQUESTED,
     title: `${requester} pediu troca: ${context.event.title}`,
     body: note,
-    link: `/agenda/${context.event.id}`,
+    link: `/eventos/${context.event.id}`,
     email: {
       subject: `Pedido de troca na escala: ${context.event.title}`,
       intro: `${requester} pediu para ser substituído na escala do evento abaixo.`,

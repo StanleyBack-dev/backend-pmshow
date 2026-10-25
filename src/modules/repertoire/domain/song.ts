@@ -13,10 +13,18 @@ export enum SongCategory {
   OUTRO = "OUTRO",
 }
 
+/** Whether the band still has to learn the song or already plays it. */
+export enum SongStage {
+  NOVA = "NOVA",
+  CONHECIDA = "CONHECIDA",
+}
+
 export type Song = {
   id: string;
   title: string;
-  artist: string | null;
+  /** Singer / band (artists module). */
+  artistId: string | null;
+  stage: SongStage;
   arranger: string | null;
   category: SongCategory;
   /** e.g. "Bb", "F#m". */
@@ -51,6 +59,11 @@ export function normalizeMusicalKey(value: string): string | null {
   const mode = rest.slice(accidental.length).toLowerCase();
   const key = `${letter}${accidental}${mode}`;
   return KEY_PATTERN.test(key) ? key : null;
+}
+
+/** Titles are stored trimmed, with single spaces and in lowercase. */
+export function normalizeSongTitle(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
 }
 
 /** Lowercase, trimmed, unique, without empty entries; at most MAX_TAGS. */
