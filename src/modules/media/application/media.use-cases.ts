@@ -124,7 +124,7 @@ export class MediaUseCase {
       createdBy: actor.id,
     });
     await this.songs.fillDurationIfMissing(songId, durationSeconds);
-    await this.record(actor, "media.video_added", asset);
+    await this.stamp(actor, asset.id, true);
     return asset;
   }
 
@@ -207,7 +207,7 @@ export class MediaUseCase {
           : null,
     });
     await this.songs.fillDurationIfMissing(ready.songId, ready.durationSeconds);
-    await this.record(actor, "media.audio_uploaded", ready);
+    await this.stamp(actor, ready.id, true);
     return ready;
   }
 
@@ -237,14 +237,14 @@ export class MediaUseCase {
     const updated = await this.assets.update(assetId, {
       title: title.trim().slice(0, 160),
     });
-    await this.record(actor, "media.renamed", updated);
+    await this.stamp(actor, updated.id);
     return updated;
   }
 
   async remove(actor: AuthenticatedUser, assetId: string): Promise<void> {
     const asset = await this.get(assetId);
     await this.discard(asset);
-    await this.record(actor, "media.removed", asset);
+    await this.stamp(actor, asset.id);
   }
 
   /** Purges uploads that were requested but never confirmed. */
@@ -293,23 +293,16 @@ export class MediaUseCase {
     }
   }
 
-  private record(
+  private stamp(
     actor: AuthenticatedUser,
-    action: string,
-    asset: MediaAsset,
+    id: string,
+    created = false,
   ): Promise<void> {
-    return this.audit.record({
+    return this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action,
       entity: "media",
-      entityId: asset.id,
-      after: {
-        songId: asset.songId,
-        kind: asset.kind,
-        title: asset.title,
-        youtubeVideoId: asset.youtubeVideoId,
-      },
+      entityId: id,
+      created,
     });
   }
 }

@@ -15,6 +15,8 @@ export type EventFilter = {
   to?: Date;
   statuses?: EventStatus[];
   type?: EventType;
+  /** Leave this type out (e.g. working days). */
+  excludeType?: EventType;
 };
 
 /** Upcoming: from now on, soonest first; past: before now, latest first. */
@@ -46,12 +48,25 @@ export interface EventRepositoryPort {
   countSetlists(eventIds: readonly string[]): Promise<Map<string, number>>;
   findById(id: string): Promise<BandEvent | null>;
   findByIds(ids: readonly string[]): Promise<BandEvent[]>;
-  create(data: EventData, createdBy: string): Promise<BandEvent>;
+  /** The event and (when given) its list of songs, in one transaction. */
+  create(
+    data: EventData,
+    createdBy: string,
+    setlist?: readonly SetlistItem[],
+  ): Promise<BandEvent>;
+  /** Many events in one statement, all with `status` (by start). */
+  createMany(
+    data: readonly EventData[],
+    createdBy: string,
+    status: EventStatus,
+  ): Promise<BandEvent[]>;
   /** The change and its outbox messages, in one transaction. */
   update(
     id: string,
     data: Partial<EventData>,
     messages: readonly OutboxDraft[],
+    /** undefined = keep the list of songs. */
+    setlist?: readonly SetlistItem[],
   ): Promise<BandEvent>;
   setStatus(
     id: string,

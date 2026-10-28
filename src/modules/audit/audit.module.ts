@@ -1,19 +1,23 @@
 import { Module } from "@nestjs/common";
-import { TypeOrmModule } from "@nestjs/typeorm";
+import { AccessControlModule } from "@/modules/access-control/access-control.module";
 import { AuditTrailService } from "@/modules/audit/application/audit-trail.service";
-import { AUDIT_LOG_REPOSITORY } from "@/modules/audit/application/ports/audit-log-repository.port";
-import { AuditLogOrmEntity } from "@/modules/audit/infrastructure/persistence/typeorm/entities/audit-log.orm-entity";
-import { AuditLogTypeormRepository } from "@/modules/audit/infrastructure/persistence/typeorm/repositories/audit-log-typeorm.repository";
+import { RECORD_STAMP_REPOSITORY } from "@/modules/audit/application/ports/record-stamp-repository.port";
+import { RecordStampTypeormRepository } from "@/modules/audit/infrastructure/persistence/record-stamp.repository";
 import { AuditResolver } from "@/modules/audit/presentation/graphql/audit.resolver";
 
-// Append-only trail of administrative actions. Other modules record through
-// AuditTrailService; reading requires AUDIT_READ.
+// Who created and who last changed each record, kept in the records' own
+// tables. Other modules stamp through AuditTrailService; everyone signed in
+// reads the stamp of what they can see (accounts and sign-ups: who manages
+// users; band profiles: who reads members).
 @Module({
-  imports: [TypeOrmModule.forFeature([AuditLogOrmEntity])],
+  imports: [AccessControlModule],
   providers: [
     AuditTrailService,
     AuditResolver,
-    { provide: AUDIT_LOG_REPOSITORY, useClass: AuditLogTypeormRepository },
+    {
+      provide: RECORD_STAMP_REPOSITORY,
+      useClass: RecordStampTypeormRepository,
+    },
   ],
   exports: [AuditTrailService],
 })

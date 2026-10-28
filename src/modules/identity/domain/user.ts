@@ -12,6 +12,8 @@ export type User = {
   updatedAt: Date;
   deactivatedAt: Date | null;
   lastLoginAt: Date | null;
+  /** Profile photo in the object storage (null: none). */
+  avatarKey: string | null;
 };
 
 /** Login state kept apart from the profile (tb_auth_credentials). */

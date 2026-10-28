@@ -99,7 +99,7 @@ export class SongsUseCase {
 
   async create(actor: AuthenticatedUser, input: SongInput): Promise<Song> {
     const song = await this.songs.create(await this.toData(input), actor.id);
-    await this.record(actor, "song.created", song.id, { title: song.title });
+    await this.stamp(actor, song.id, true);
     return song;
   }
 
@@ -113,15 +113,7 @@ export class SongsUseCase {
       id,
       await this.toData(input, before.artistId),
     );
-    await this.record(
-      actor,
-      "song.updated",
-      id,
-      { title: song.title },
-      {
-        title: before.title,
-      },
-    );
+    await this.stamp(actor, id);
     return song;
   }
 
@@ -136,9 +128,7 @@ export class SongsUseCase {
       id,
       archived ? this.clock.now() : null,
     );
-    await this.record(actor, archived ? "song.archived" : "song.restored", id, {
-      title: song.title,
-    });
+    await this.stamp(actor, id);
     return song;
   }
 
@@ -188,21 +178,16 @@ export class SongsUseCase {
     };
   }
 
-  private record(
+  private stamp(
     actor: AuthenticatedUser,
-    action: string,
     id: string,
-    after: Record<string, unknown>,
-    before?: Record<string, unknown>,
+    created = false,
   ): Promise<void> {
-    return this.audit.record({
+    return this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action,
       entity: "song",
       entityId: id,
-      before,
-      after,
+      created,
     });
   }
 }

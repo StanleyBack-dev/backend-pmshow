@@ -46,6 +46,8 @@ export interface ObjectStoragePort {
     maxBytes: number;
     expiresInSeconds: number;
   }): Promise<UploadForm>;
+  /** Stores a file the server already checked (e.g. a profile photo). */
+  put(key: string, body: Buffer, contentType: string): Promise<void>;
   head(
     key: string,
   ): Promise<{ sizeBytes: number; contentType: string | null } | null>;

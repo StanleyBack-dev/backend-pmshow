@@ -38,6 +38,16 @@ export const availabilityErrors = {
     status: HttpStatus.FORBIDDEN,
     message: "Outro gestor precisa analisar o seu próprio pedido.",
   },
+  invalidAttachments: {
+    code: "ABSENCE_INVALID_ATTACHMENTS",
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: (params: { reason: string }) => params.reason,
+  },
+  attachmentNotFound: {
+    code: "ABSENCE_ATTACHMENT_NOT_FOUND",
+    status: HttpStatus.NOT_FOUND,
+    message: "Anexo não encontrado ou sem acesso.",
+  },
   cannotCancel: {
     code: "ABSENCE_CANNOT_CANCEL",
     status: HttpStatus.FORBIDDEN,

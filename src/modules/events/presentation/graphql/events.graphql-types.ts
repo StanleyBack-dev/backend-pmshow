@@ -252,6 +252,17 @@ export class EventInput {
   @IsString()
   @MaxLength(2000)
   notes?: string | null;
+
+  @Field(() => [SetlistItemInput], {
+    nullable: true,
+    description: "Lista de músicas salva com o evento; vazio = mantém a atual.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => SetlistItemInput)
+  setlist?: SetlistItemInput[];
 }
 
 @InputType()

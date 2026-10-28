@@ -17,6 +17,11 @@ export const eventsErrors = {
     status: HttpStatus.CONFLICT,
     message: "Este evento já foi realizado e não pode mais ser alterado.",
   },
+  eventCancelled: {
+    code: "EVENT_CANCELLED",
+    status: HttpStatus.CONFLICT,
+    message: "Este evento está cancelado. Reabra o evento para alterá-lo.",
+  },
   invalidStatusChange: {
     code: "EVENT_INVALID_STATUS_CHANGE",
     status: HttpStatus.UNPROCESSABLE_ENTITY,

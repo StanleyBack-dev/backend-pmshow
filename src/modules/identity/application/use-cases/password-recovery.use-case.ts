@@ -148,9 +148,8 @@ export class PasswordRecoveryUseCase {
     await this.codes.update(record.id, { consumedAt: now });
     await this.passwords.setChosen(user.id, newPassword);
     await this.notifier.passwordChanged(user);
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: user.id,
-      action: "user.password_recovered",
       entity: "user",
       entityId: user.id,
     });

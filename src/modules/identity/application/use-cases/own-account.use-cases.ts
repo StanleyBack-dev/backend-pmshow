@@ -64,12 +64,8 @@ export class ChangeOwnPasswordUseCase {
       actor.sessionId,
     );
     await this.notifier.passwordChanged(user);
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: credential.mustChangePassword
-        ? "user.first_access_completed"
-        : "user.password_changed",
       entity: "user",
       entityId: actor.id,
     });
@@ -102,14 +98,10 @@ export class UpdateOwnProfileUseCase {
 
     const name = input.name.trim();
     const updated = await this.users.update(actor.id, { name, email });
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "user.profile_updated",
       entity: "user",
       entityId: actor.id,
-      before: { name: before.name, email: before.email },
-      after: { name, email },
     });
     return updated;
   }

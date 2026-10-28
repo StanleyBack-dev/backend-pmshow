@@ -21,6 +21,7 @@ export type RosterFilter = {
   section?: Section;
   status?: MemberStatus;
   instrumentId?: string;
+  functionId?: string;
   /** false = only users still without a band profile. */
   withProfile?: boolean;
 };
@@ -34,6 +35,8 @@ export type MemberProfileData = {
   status: MemberStatus;
   notes: string | null;
   instruments: { instrumentId: string; primary: boolean }[];
+  /** undefined = keep the functions the profile already has. */
+  functionIds?: string[];
 };
 
 export interface MemberRepositoryPort {
@@ -44,7 +47,7 @@ export interface MemberRepositoryPort {
   findProfile(userId: string): Promise<MemberProfile | null>;
   /** userId of the profile holding this registration, if any. */
   findUserIdByRegistration(registration: string): Promise<string | null>;
-  /** Creates or replaces the profile and its instruments atomically. */
+  /** Creates or replaces the profile, instruments and functions atomically. */
   saveProfile(userId: string, data: MemberProfileData): Promise<MemberProfile>;
 }
 

@@ -32,8 +32,24 @@ export class PermissionsService {
     );
   }
 
-  async effectiveFor(subject: Subject): Promise<ReadonlySet<Permission>> {
-    return new Set((await this.matrixFor(subject)).effective);
+  // The request's user object lives for one request: the guard and every
+  // field resolver of that request share one lookup.
+  private readonly perRequest = new WeakMap<
+    Subject,
+    Promise<ReadonlySet<Permission>>
+  >();
+
+  effectiveFor(subject: Subject): Promise<ReadonlySet<Permission>> {
+    let found = this.perRequest.get(subject);
+    if (!found) {
+      found = this.matrixFor(subject).then(
+        (matrix) => new Set(matrix.effective),
+      );
+      this.perRequest.set(subject, found);
+      // A failed lookup is not remembered.
+      found.catch(() => this.perRequest.delete(subject));
+    }
+    return found;
   }
 
   /** `desired = null` drops every override (back to the group defaults). */

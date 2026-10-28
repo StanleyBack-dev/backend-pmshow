@@ -34,17 +34,49 @@ type ArtistPage {
   totalPages: Int!
 }
 
-type AuditEntry {
-  id: ID!
-  actorId: ID
-  actorName: String
-  action: String!
-  entity: String!
-  entityId: String
-  before: JSON
-  after: JSON
-  ip: String
+"""Quem criou e quem alterou por último um registro."""
+type RecordStamp {
   createdAt: DateTime!
+  createdById: ID
+  createdByName: String
+  updatedAt: DateTime!
+  updatedById: ID
+  updatedByName: String
+}
+
+type MediaAsset {
+  id: ID!
+  songId: ID!
+  kind: MediaKind!
+  status: MediaStatus!
+  title: String!
+  mimeType: String
+  sizeBytes: Float
+  durationSeconds: Int
+
+  """Id do vídeo no YouTube (só VIDEO)."""
+  youtubeVideoId: String
+  thumbnailUrl: String
+  createdAt: DateTime!
+}
+
+enum MediaKind {
+  AUDIO
+  VIDEO
+}
+
+enum MediaStatus {
+  PENDING
+  READY
+}
+
+"""
+Formulário assinado: o navegador envia (POST multipart) os `fields` + o arquivo direto para `url`.
+"""
+type UploadForm {
+  url: String!
+  fields: JSON!
+  expiresAt: DateTime!
 }
 
 """
@@ -52,12 +84,31 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://
 """
 scalar JSON
 
-type AuditEntryPage {
-  items: [AuditEntry!]!
-  total: Int!
-  page: Int!
-  limit: Int!
-  totalPages: Int!
+type AudioUploadTicket {
+  asset: MediaAsset!
+  upload: UploadForm!
+}
+
+"""Vídeo encontrado no YouTube."""
+type YoutubeSearchResult {
+  videoId: String!
+  title: String!
+
+  """Canal que publicou."""
+  channelTitle: String!
+  thumbnailUrl: String!
+  publishedAt: String
+
+  """Duração em segundos."""
+  durationSeconds: Int
+}
+
+"""Arquivo anexado ao pedido."""
+type AbsenceAttachment {
+  id: ID!
+  fileName: String!
+  mimeType: String!
+  sizeBytes: Int!
 }
 
 """Período em que alguém não pode ser escalado."""
@@ -77,7 +128,18 @@ type Absence {
   status: AbsenceStatus!
   reviewNote: String
   reviewedAt: DateTime
+
+  """Quem aprovou/recusou: nome completo (nome de guerra)."""
+  reviewedByName: String
+  cancelledAt: DateTime
+
+  """Quem cancelou: nome completo (nome de guerra)."""
+  cancelledByName: String
+
+  """Lançada por um gestor para o integrante (já aprovada)."""
+  registered: Boolean!
   createdAt: DateTime!
+  attachments: [AbsenceAttachment!]!
 }
 
 """Motivo da indisponibilidade."""
@@ -95,6 +157,36 @@ enum AbsenceStatus {
   APROVADA
   RECUSADA
   CANCELADA
+}
+
+"""Para onde enviar um anexo (formulário assinado)."""
+type AbsenceAttachmentUpload {
+  storageKey: String!
+  upload: UploadForm!
+}
+
+"""Função na banda (regente, motorista, técnico de som…)."""
+type BandFunction {
+  id: ID!
+  name: String!
+  archived: Boolean!
+}
+
+type BandFunctionListItem {
+  id: ID!
+  name: String!
+  archived: Boolean!
+
+  """Integrantes com esta função."""
+  memberCount: Int!
+}
+
+type BandFunctionPage {
+  items: [BandFunctionListItem!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
 }
 
 """Comunicado enviado por um gestor."""
@@ -128,7 +220,6 @@ enum Section {
   CORDAS_BASE
   VOCAL
   TECNICA
-  APOIO
 }
 
 """Painel do gestor."""
@@ -214,6 +305,9 @@ type Event {
 
   """Escala do evento (null: sem escala ou sem permissão)."""
   rosterSummary: RosterSummary
+
+  """Minha linha na escala publicada do evento (null: não estou nela)."""
+  myAssignment: Assignment
 }
 
 """Tipo de apresentação ou compromisso."""
@@ -225,6 +319,7 @@ enum EventType {
   FORMATURA
   ENSAIO
   CULTO_MISSA
+  EXPEDIENTE
   OUTRO
 }
 
@@ -277,6 +372,377 @@ type ZipCodeAddress {
   district: String
   city: String!
   state: String!
+}
+
+type Instrument {
+  id: ID!
+  name: String!
+  section: Section!
+  archived: Boolean!
+}
+
+type InstrumentListItem {
+  id: ID!
+  name: String!
+  section: Section!
+  archived: Boolean!
+
+  """Integrantes com este instrumento."""
+  memberCount: Int!
+}
+
+type InstrumentPage {
+  items: [InstrumentListItem!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+type MemberInstrument {
+  instrumentId: ID!
+  name: String!
+  primary: Boolean!
+}
+
+type MemberFunction {
+  functionId: ID!
+  name: String!
+}
+
+"""Cadastro do integrante na banda."""
+type MemberProfile {
+  userId: ID!
+
+  """Nome de guerra."""
+  warName: String!
+  rank: Rank!
+
+  """Matrícula."""
+  registration: String
+
+  """Só dígitos (DDD + número)."""
+  phone: String
+  section: Section!
+  status: MemberStatus!
+  notes: String
+  instruments: [MemberInstrument!]!
+  functions: [MemberFunction!]!
+  updatedAt: DateTime!
+}
+
+"""Posto/graduação."""
+enum Rank {
+  SOLDADO
+  CABO
+  TERCEIRO_SARGENTO
+  SEGUNDO_SARGENTO
+  PRIMEIRO_SARGENTO
+  SUBTENENTE
+  CADETE
+  ASPIRANTE
+  SEGUNDO_TENENTE
+  PRIMEIRO_TENENTE
+  CAPITAO
+  MAJOR
+  TENENTE_CORONEL
+  CORONEL
+  CIVIL
+}
+
+"""Situação do integrante na banda."""
+enum MemberStatus {
+  ATIVO
+  AFASTADO
+  INATIVO
+}
+
+"""Usuário com acesso e, quando houver, o cadastro na banda."""
+type RosterEntry {
+  userId: ID!
+  name: String!
+  username: String!
+
+  """Se o acesso ao app está ativo."""
+  active: Boolean!
+  profile: MemberProfile
+}
+
+type RosterPage {
+  items: [RosterEntry!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+"""Expediente lançado (semana ou mês de dias de trabalho)."""
+type DutySchedule {
+  id: ID!
+  title: String!
+
+  """Primeiro dia (AAAA-MM-DD)."""
+  startsOn: String!
+
+  """Último dia (AAAA-MM-DD)."""
+  endsOn: String!
+  venueId: ID!
+  uniform: EventUniform!
+  notes: String
+  audienceKind: DutyAudienceKind!
+  sections: [Section!]!
+  status: DutyScheduleStatus!
+  cancellationReason: String
+
+  """Dias de trabalho."""
+  dayCount: Int!
+
+  """Pessoas escaladas."""
+  memberCount: Int!
+  createdAt: DateTime!
+}
+
+"""Para quem é o expediente."""
+enum DutyAudienceKind {
+  """Toda a banda (integrantes ativos)."""
+  ALL
+
+  """Os naipes escolhidos."""
+  SECTIONS
+
+  """Os músicos escolhidos."""
+  MEMBERS
+}
+
+enum DutyScheduleStatus {
+  ATIVA
+  CANCELADA
+}
+
+type DutySchedulePage {
+  items: [DutySchedule!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+type DutyScheduleDetail {
+  id: ID!
+  title: String!
+
+  """Primeiro dia (AAAA-MM-DD)."""
+  startsOn: String!
+
+  """Último dia (AAAA-MM-DD)."""
+  endsOn: String!
+  venueId: ID!
+  uniform: EventUniform!
+  notes: String
+  audienceKind: DutyAudienceKind!
+  sections: [Section!]!
+  status: DutyScheduleStatus!
+  cancellationReason: String
+
+  """Dias de trabalho."""
+  dayCount: Int!
+
+  """Pessoas escaladas."""
+  memberCount: Int!
+  createdAt: DateTime!
+  venue: Venue
+
+  """Os dias (eventos)."""
+  days: [Event!]!
+
+  """Quem está escalado."""
+  members: [RosterEntry!]!
+}
+
+type PermissionOverride {
+  permission: Permission!
+  allowed: Boolean!
+}
+
+"""Capacidade verificada pela API."""
+enum Permission {
+  REPERTOIRE_READ
+  REPERTOIRE_MANAGE
+  MEDIA_UPLOAD
+  MEDIA_DOWNLOAD
+  EVENTS_READ
+  EVENTS_MANAGE
+  ROSTERS_READ_OWN
+  ROSTERS_READ_ALL
+  ROSTERS_MANAGE
+  ROSTERS_PUBLISH
+  MEMBERS_READ
+  MEMBERS_MANAGE
+  ABSENCES_REQUEST
+  ABSENCES_MANAGE
+  NOTIFICATIONS_BROADCAST
+  USERS_MANAGE
+  PERMISSIONS_MANAGE
+  AUDIT_READ
+}
+
+type PermissionMatrix {
+  """O que o usuário pode fazer (padrão do grupo + exceções)."""
+  effective: [Permission!]!
+
+  """O que o grupo concede."""
+  defaults: [Permission!]!
+
+  """Exceções do usuário em relação ao grupo."""
+  overrides: [PermissionOverride!]!
+}
+
+"""Usuário da sessão atual."""
+type SessionUser {
+  id: ID!
+  name: String!
+  username: String!
+  email: String!
+  group: UserGroup!
+
+  """Precisa trocar a senha temporária antes de usar o app."""
+  mustChangePassword: Boolean!
+
+  """Permissões efetivas."""
+  permissions: [Permission!]!
+
+  """Link temporário da foto de perfil (null: sem foto)."""
+  photoUrl: String
+}
+
+"""Perfil de acesso: Músico, Gestor ou Administrador geral."""
+enum UserGroup {
+  """Músico"""
+  USER
+
+  """Gestor"""
+  ADMIN
+
+  """Administrador geral"""
+  ADMIN_MASTER
+}
+
+type AuthTokens {
+  accessToken: String!
+  accessTokenExpiresAt: DateTime!
+  refreshToken: String!
+  refreshTokenExpiresAt: DateTime!
+}
+
+type LoginResult {
+  accessToken: String!
+  accessTokenExpiresAt: DateTime!
+  refreshToken: String!
+  refreshTokenExpiresAt: DateTime!
+  user: SessionUser!
+}
+
+"""Usuário visto pela administração."""
+type UserAccount {
+  id: ID!
+  name: String!
+  email: String!
+  username: String!
+  group: UserGroup!
+  active: Boolean!
+
+  """Ainda não trocou a senha temporária."""
+  mustChangePassword: Boolean!
+
+  """Bloqueado por tentativas inválidas até esta data."""
+  lockedUntil: DateTime
+  lastLoginAt: DateTime
+  deactivatedAt: DateTime
+  createdAt: DateTime!
+
+  """Bloqueado agora por tentativas inválidas de login."""
+  locked: Boolean!
+}
+
+type UserAccountPage {
+  items: [UserAccount!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+"""Senha temporária, exibida uma única vez para quem a gerou."""
+type TemporaryAccess {
+  user: UserAccount!
+  temporaryPassword: String!
+
+  """Se o e-mail com o acesso foi enviado."""
+  emailSent: Boolean!
+}
+
+"""Código de convite da turma para o formulário público."""
+type EnrollmentInvite {
+  id: ID!
+  code: String!
+  label: String!
+  expiresAt: DateTime!
+  revokedAt: DateTime
+  createdAt: DateTime!
+
+  """Cadastros enviados com este código."""
+  requestCount: Int!
+}
+
+type EnrollmentInstrumentChoice {
+  instrumentId: ID!
+  primary: Boolean!
+}
+
+type EnrollmentRequest {
+  id: ID!
+  status: EnrollmentStatus!
+  fullName: String!
+  email: String!
+  phone: String!
+  military: Boolean!
+
+  """RG militar."""
+  militaryId: String
+  rank: Rank!
+  warName: String!
+  instruments: [EnrollmentInstrumentChoice!]!
+  createdAt: DateTime!
+  reviewedAt: DateTime
+  rejectionReason: String
+  userId: ID
+  photoUrl: String
+}
+
+"""Situação do cadastro enviado pelo link público."""
+enum EnrollmentStatus {
+  PENDENTE
+  APROVADA
+  RECUSADA
+}
+
+type EnrollmentRequestPage {
+  items: [EnrollmentRequest!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+type EnrollmentApproval {
+  request: EnrollmentRequest!
+  access: TemporaryAccess!
+}
+
+"""Instrumento oferecido no formulário público."""
+type EnrollmentInstrument {
+  id: ID!
+  name: String!
 }
 
 type Song {
@@ -346,257 +812,6 @@ type LyricsResult {
   sourceUrl: String
 }
 
-type PermissionOverride {
-  permission: Permission!
-  allowed: Boolean!
-}
-
-"""Capacidade verificada pela API."""
-enum Permission {
-  REPERTOIRE_READ
-  REPERTOIRE_MANAGE
-  MEDIA_UPLOAD
-  MEDIA_DOWNLOAD
-  EVENTS_READ
-  EVENTS_MANAGE
-  ROSTERS_READ_OWN
-  ROSTERS_READ_ALL
-  ROSTERS_MANAGE
-  ROSTERS_PUBLISH
-  MEMBERS_READ
-  MEMBERS_MANAGE
-  ABSENCES_REQUEST
-  ABSENCES_MANAGE
-  NOTIFICATIONS_BROADCAST
-  USERS_MANAGE
-  PERMISSIONS_MANAGE
-  AUDIT_READ
-}
-
-type PermissionMatrix {
-  """O que o usuário pode fazer (padrão do grupo + exceções)."""
-  effective: [Permission!]!
-
-  """O que o grupo concede."""
-  defaults: [Permission!]!
-
-  """Exceções do usuário em relação ao grupo."""
-  overrides: [PermissionOverride!]!
-}
-
-"""Usuário da sessão atual."""
-type SessionUser {
-  id: ID!
-  name: String!
-  username: String!
-  email: String!
-  group: UserGroup!
-
-  """Precisa trocar a senha temporária antes de usar o app."""
-  mustChangePassword: Boolean!
-
-  """Permissões efetivas."""
-  permissions: [Permission!]!
-}
-
-"""Perfil de acesso: Músico, Gestor ou Administrador geral."""
-enum UserGroup {
-  """Músico"""
-  USER
-
-  """Gestor"""
-  ADMIN
-
-  """Administrador geral"""
-  ADMIN_MASTER
-}
-
-type AuthTokens {
-  accessToken: String!
-  accessTokenExpiresAt: DateTime!
-  refreshToken: String!
-  refreshTokenExpiresAt: DateTime!
-}
-
-type LoginResult {
-  accessToken: String!
-  accessTokenExpiresAt: DateTime!
-  refreshToken: String!
-  refreshTokenExpiresAt: DateTime!
-  user: SessionUser!
-}
-
-"""Usuário visto pela administração."""
-type UserAccount {
-  id: ID!
-  name: String!
-  email: String!
-  username: String!
-  group: UserGroup!
-  active: Boolean!
-
-  """Ainda não trocou a senha temporária."""
-  mustChangePassword: Boolean!
-
-  """Bloqueado por tentativas inválidas até esta data."""
-  lockedUntil: DateTime
-  lastLoginAt: DateTime
-  deactivatedAt: DateTime
-  createdAt: DateTime!
-
-  """Bloqueado agora por tentativas inválidas de login."""
-  locked: Boolean!
-}
-
-type UserAccountPage {
-  items: [UserAccount!]!
-  total: Int!
-  page: Int!
-  limit: Int!
-  totalPages: Int!
-}
-
-"""Senha temporária, exibida uma única vez para quem a gerou."""
-type TemporaryAccess {
-  user: UserAccount!
-  temporaryPassword: String!
-
-  """Se o e-mail com o acesso foi enviado."""
-  emailSent: Boolean!
-}
-
-type MediaAsset {
-  id: ID!
-  songId: ID!
-  kind: MediaKind!
-  status: MediaStatus!
-  title: String!
-  mimeType: String
-  sizeBytes: Float
-  durationSeconds: Int
-
-  """Id do vídeo no YouTube (só VIDEO)."""
-  youtubeVideoId: String
-  thumbnailUrl: String
-  createdAt: DateTime!
-}
-
-enum MediaKind {
-  AUDIO
-  VIDEO
-}
-
-enum MediaStatus {
-  PENDING
-  READY
-}
-
-"""
-Formulário assinado: o navegador envia (POST multipart) os `fields` + o arquivo direto para `url`.
-"""
-type UploadForm {
-  url: String!
-  fields: JSON!
-  expiresAt: DateTime!
-}
-
-type AudioUploadTicket {
-  asset: MediaAsset!
-  upload: UploadForm!
-}
-
-"""Vídeo encontrado no YouTube."""
-type YoutubeSearchResult {
-  videoId: String!
-  title: String!
-
-  """Canal que publicou."""
-  channelTitle: String!
-  thumbnailUrl: String!
-  publishedAt: String
-
-  """Duração em segundos."""
-  durationSeconds: Int
-}
-
-type Instrument {
-  id: ID!
-  name: String!
-  section: Section!
-  archived: Boolean!
-}
-
-type MemberInstrument {
-  instrumentId: ID!
-  name: String!
-  primary: Boolean!
-}
-
-"""Cadastro do integrante na banda."""
-type MemberProfile {
-  userId: ID!
-
-  """Nome de guerra."""
-  warName: String!
-  rank: Rank!
-
-  """Matrícula."""
-  registration: String
-
-  """Só dígitos (DDD + número)."""
-  phone: String
-  section: Section!
-  status: MemberStatus!
-  notes: String
-  instruments: [MemberInstrument!]!
-  updatedAt: DateTime!
-}
-
-"""Posto/graduação."""
-enum Rank {
-  SOLDADO
-  CABO
-  TERCEIRO_SARGENTO
-  SEGUNDO_SARGENTO
-  PRIMEIRO_SARGENTO
-  SUBTENENTE
-  CADETE
-  ASPIRANTE
-  SEGUNDO_TENENTE
-  PRIMEIRO_TENENTE
-  CAPITAO
-  MAJOR
-  TENENTE_CORONEL
-  CORONEL
-  CIVIL
-}
-
-"""Situação do integrante na banda."""
-enum MemberStatus {
-  ATIVO
-  AFASTADO
-  INATIVO
-}
-
-"""Usuário com acesso e, quando houver, o cadastro na banda."""
-type RosterEntry {
-  userId: ID!
-  name: String!
-  username: String!
-
-  """Se o acesso ao app está ativo."""
-  active: Boolean!
-  profile: MemberProfile
-}
-
-type RosterPage {
-  items: [RosterEntry!]!
-  total: Int!
-  page: Int!
-  limit: Int!
-  totalPages: Int!
-}
-
 type Notification {
   id: ID!
   type: NotificationType!
@@ -616,9 +831,14 @@ enum NotificationType {
   EVENT_RESCHEDULED
   EVENT_CANCELLED
   ROSTER_SWAP_REQUESTED
+  ROSTER_SWAP_DECLINED
   ABSENCE_REVIEWED
+  ABSENCE_REQUESTED
+  DUTY_SCHEDULED
+  DUTY_CANCELLED
   EVENT_REMINDER
   BROADCAST
+  ENROLLMENT_SUBMITTED
 }
 
 type NotificationPage {
@@ -652,7 +872,9 @@ enum RosterStatus {
 """Uma pessoa na escala."""
 type Assignment {
   userId: ID!
-  role: AssignmentRole!
+
+  """Função na banda (regente, motorista…); vazio = músico."""
+  functionId: ID
   instrumentId: ID
   notes: String
 
@@ -662,19 +884,12 @@ type Assignment {
   ackNote: String
   ackAt: DateTime
 
+  """Nome da função; vazio = músico."""
+  functionName: String
+
   """null se a conta foi desativada."""
   person: RosterPerson
   instrumentName: String
-}
-
-"""Função na escala."""
-enum AssignmentRole {
-  MUSICO
-  REGENTE
-  CHEFE_EQUIPE
-  MOTORISTA
-  SOM
-  APOIO
 }
 
 """Resposta do escalado."""
@@ -699,7 +914,9 @@ type Roster {
 """Minha participação numa escala publicada."""
 type MyAssignment {
   userId: ID!
-  role: AssignmentRole!
+
+  """Função na banda (regente, motorista…); vazio = músico."""
+  functionId: ID
   instrumentId: ID
   notes: String
 
@@ -708,6 +925,9 @@ type MyAssignment {
   ackStatus: AckStatus!
   ackNote: String
   ackAt: DateTime
+
+  """Nome da função; vazio = músico."""
+  functionName: String
 
   """null se a conta foi desativada."""
   person: RosterPerson
@@ -733,9 +953,16 @@ type RosterCandidate {
   name: String!
   warName: String!
   rank: Rank!
+
+  """Matrícula."""
+  registration: String
+
+  """Só dígitos (DDD + número)."""
+  phone: String
   section: Section!
   memberStatus: MemberStatus!
   instruments: [MemberInstrument!]!
+  functions: [MemberFunction!]!
   blocker: CandidateBlocker
   absence: CandidateAbsence
 
@@ -763,7 +990,31 @@ type RosterPerson {
   name: String!
   warName: String!
   rank: Rank!
+
+  """Matrícula."""
+  registration: String
+
+  """Só dígitos (DDD + número)."""
+  phone: String
   section: Section!
+}
+
+type MyAssignmentPage {
+  items: [MyAssignment!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+type MyAssignmentCounts {
+  acknowledged: Int!
+
+  """Aguardando ciência ou com troca pedida."""
+  pending: Int!
+
+  """Dias de expediente."""
+  duty: Int!
 }
 
 type Query {
@@ -776,16 +1027,38 @@ type Query {
   """Em ordem alfabética."""
   artists(includeArchived: Boolean! = false): [Artist!]!
 
-  """Trilha de auditoria, da mais recente para a mais antiga."""
-  auditLogs(filter: AuditFilterInput, page: PageInput): AuditEntryPage!
+  """
+  Criação e última alteração de um registro (null: não existe). Para todos; contas e cadastros só para quem gerencia usuários.
+  """
+  recordStamp(entity: String!, id: ID!): RecordStamp
   myAbsences: [Absence!]!
 
   """Até 500, das mais recentes."""
   absences(filter: AbsenceFilterInput): [Absence!]!
 
+  """Link curto para ver ou baixar um anexo (dono ou gestor)."""
+  absenceAttachmentUrl(id: ID!, download: Boolean! = false): String!
+
+  """Funções da banda, por nome."""
+  bandFunctions(includeArchived: Boolean! = false): [BandFunction!]!
+
+  """Página do catálogo de funções: busca e arquivadas."""
+  bandFunctionsPage(filter: BandFunctionFilterInput, page: PageInput): BandFunctionPage!
+
   """Últimos 50 comunicados."""
   broadcasts: [Broadcast!]!
   bandDashboard: BandDashboard!
+
+  """Expedientes lançados, mais recentes primeiro."""
+  dutySchedulesPage(filter: DutyScheduleFilterInput, page: PageInput): DutySchedulePage!
+  dutySchedule(id: ID!): DutyScheduleDetail!
+  enrollmentInstruments(formToken: String!): [EnrollmentInstrument!]!
+  enrollmentInvites: [EnrollmentInvite!]!
+  enrollmentRequests(filter: EnrollmentRequestFilterInput, page: PageInput): EnrollmentRequestPage!
+
+  """Cadastros aguardando aprovação."""
+  pendingEnrollmentCount: Int!
+  enrollmentRequest(id: ID!): EnrollmentRequest!
 
   """Eventos por período (ordenados pelo início, até 500)."""
   events(filter: EventFilterInput): [Event!]!
@@ -793,7 +1066,7 @@ type Query {
   """Página de eventos: busca, tipo, situação e período."""
   eventsPage(filter: EventPageFilterInput, page: PageInput): EventPage!
 
-  """Próximos eventos planejados ou confirmados."""
+  """Próximos eventos planejados ou confirmados (sem os expedientes)."""
   upcomingEvents(limit: Int! = 5): [Event!]!
   event(id: ID!): Event!
 
@@ -825,6 +1098,9 @@ type Query {
   myMemberProfile: MemberProfile
   instruments(includeArchived: Boolean! = false): [Instrument!]!
 
+  """Página do catálogo de instrumentos: busca, naipe, arquivados."""
+  instrumentsPage(filter: InstrumentFilterInput, page: PageInput): InstrumentPage!
+
   """Mais recentes primeiro."""
   myNotifications(unreadOnly: Boolean! = false, page: PageInput): NotificationPage!
   unreadNotificationsCount: Int!
@@ -845,7 +1121,7 @@ type Query {
   findLyrics(artist: String!, title: String!): LyricsResult
 
   """
-  Escala do evento. Rascunhos só para quem vê todas; publicada para quem está nela.
+  Escala do evento. Rascunhos só para quem vê todas; publicada para todos (sem contatos para quem não é gestor).
   """
   eventRoster(eventId: ID!): Roster
 
@@ -853,7 +1129,21 @@ type Query {
   rosterCandidates(eventId: ID!): [RosterCandidate!]!
 
   """Minhas escalas publicadas, dos próximos eventos."""
-  myAssignments: [MyAssignment!]!
+  myAssignments(
+    """true: só cientes; false: as que faltam ciência; vazio: todas."""
+    acknowledged: Boolean
+  ): [MyAssignment!]!
+
+  """Minhas escalas publicadas de uma aba, por página."""
+  myAssignmentsPage(tab: MyAssignmentTab!, page: PageInput): MyAssignmentPage!
+
+  """Quantas das minhas escalas há em cada aba."""
+  myAssignmentCounts: MyAssignmentCounts!
+
+  """
+  Pedidos de troca em aberto nas escalas publicadas dos próximos eventos.
+  """
+  swapRequests(page: PageInput): MyAssignmentPage!
 }
 
 input ArtistFilterInput {
@@ -872,12 +1162,6 @@ input PageInput {
   limit: Int! = 20
 }
 
-input AuditFilterInput {
-  entity: String
-  entityId: String
-  actorId: ID
-}
-
 input AbsenceFilterInput {
   userId: ID
   statuses: [AbsenceStatus!]
@@ -887,6 +1171,24 @@ input AbsenceFilterInput {
 
   """Tocando o período até (AAAA-MM-DD)."""
   to: String
+}
+
+input BandFunctionFilterInput {
+  """Parte do nome."""
+  search: String
+
+  """Arquivadas (padrão: ativas)."""
+  archived: Boolean
+}
+
+input DutyScheduleFilterInput {
+  search: String
+  status: DutyScheduleStatus
+}
+
+input EnrollmentRequestFilterInput {
+  status: EnrollmentStatus
+  search: String
 }
 
 input EventFilterInput {
@@ -932,9 +1234,19 @@ input RosterFilterInput {
   section: Section
   status: MemberStatus
   instrumentId: ID
+  functionId: ID
 
   """false = só quem ainda não tem cadastro."""
   withProfile: Boolean
+}
+
+input InstrumentFilterInput {
+  """Parte do nome."""
+  search: String
+  section: Section
+
+  """Arquivados (padrão: ativos)."""
+  archived: Boolean
 }
 
 input SongFilterInput {
@@ -952,6 +1264,18 @@ input SongFilterInput {
   archived: Boolean! = false
 }
 
+"""Aba de Minhas escalas."""
+enum MyAssignmentTab {
+  """Eventos aguardando ciência (ou com troca pedida)."""
+  PENDING
+
+  """Eventos com ciência confirmada."""
+  ACKNOWLEDGED
+
+  """Dias de expediente (sem ciência)."""
+  DUTY
+}
+
 type Mutation {
   createArtist(input: ArtistInput!): Artist!
   updateArtist(id: ID!, input: ArtistInput!): Artist!
@@ -959,11 +1283,40 @@ type Mutation {
   """Pede para si (pendente)."""
   requestAbsence(input: AbsenceInput!): Absence!
 
+  """Formulários para enviar os anexos do pedido direto ao armazenamento."""
+  requestAbsenceAttachmentUploads(files: [AttachmentFileInput!]!): [AbsenceAttachmentUpload!]!
+
   """Lança para alguém, já aprovada."""
   registerAbsence(userId: ID!, input: AbsenceInput!): Absence!
   reviewAbsence(id: ID!, approve: Boolean!, note: String): Absence!
   cancelAbsence(id: ID!): Absence!
+  createBandFunction(input: CreateBandFunctionInput!): BandFunction!
+  updateBandFunction(id: ID!, input: UpdateBandFunctionInput!): BandFunction!
   sendBroadcast(input: BroadcastInput!): Broadcast!
+
+  """
+  Lança o expediente: um evento por dia, com a escala publicada; avisa cada pessoa uma vez.
+  """
+  createDutySchedule(input: DutyScheduleInput!): DutySchedule!
+
+  """Cancela os dias que ainda não aconteceram e avisa uma vez."""
+  cancelDutySchedule(id: ID!, input: CancelDutyScheduleInput!): DutySchedule!
+
+  """
+  Confere o código da turma e devolve o token do formulário (vale 60 min).
+  """
+  verifyEnrollmentCode(code: String!): String!
+
+  """Envia o cadastro, que aguarda a aprovação da administração."""
+  submitEnrollment(input: SubmitEnrollmentInput!): Boolean!
+  createEnrollmentInvite(input: CreateEnrollmentInviteInput!): EnrollmentInvite!
+  revokeEnrollmentInvite(id: ID!): EnrollmentInvite!
+
+  """
+  Aprova o cadastro (com as correções): cria o usuário e o perfil de músico.
+  """
+  approveEnrollmentRequest(id: ID!, data: EnrollmentDataInput!, group: UserGroup!): EnrollmentApproval!
+  rejectEnrollmentRequest(id: ID!, reason: String!): EnrollmentRequest!
   createEvent(input: EventInput!): Event!
   updateEvent(id: ID!, input: EventInput!): Event!
 
@@ -1041,6 +1394,14 @@ type Mutation {
 
   """Envia um push de teste; devolve quantos aparelhos receberam."""
   sendTestPush: Int!
+
+  """
+  Troca a própria foto de perfil (base64, já reduzida pelo navegador). Devolve o link temporário.
+  """
+  setMyPhoto(photo: String!): String!
+
+  """Remove a própria foto de perfil."""
+  removeMyPhoto: Boolean!
   createSong(input: SongInput!): Song!
   updateSong(id: ID!, input: SongInput!): Song!
 
@@ -1051,6 +1412,11 @@ type Mutation {
   Substitui a lista da escala. Publicada: notifica só quem entrou, saiu ou mudou de função.
   """
   saveRoster(eventId: ID!, input: RosterInput!): Roster!
+
+  """
+  Não aceita o pedido de troca: a pessoa continua na escala e volta a dar ciência (é avisada).
+  """
+  keepOnRoster(eventId: ID!, userId: ID!, note: String): Assignment!
 
   """Publica e notifica todos."""
   publishRoster(eventId: ID!): Roster!
@@ -1075,6 +1441,30 @@ input AbsenceInput {
   """AAAA-MM-DD"""
   endsOn: String!
   reason: String
+
+  """Imagens ou PDF já enviados (até 3)."""
+  attachments: [AttachedFileInput!]
+}
+
+input AttachedFileInput {
+  """Chave devolvida por requestAbsenceAttachmentUploads."""
+  storageKey: String!
+  fileName: String!
+}
+
+input AttachmentFileInput {
+  fileName: String!
+  mimeType: String!
+  sizeBytes: Int!
+}
+
+input CreateBandFunctionInput {
+  name: String!
+}
+
+input UpdateBandFunctionInput {
+  name: String
+  archived: Boolean
 }
 
 input BroadcastInput {
@@ -1088,6 +1478,68 @@ input BroadcastInput {
   sendEmail: Boolean!
 }
 
+input DutyScheduleInput {
+  title: String
+  venueId: ID!
+  uniform: EventUniform!
+  notes: String
+  days: [DutyDayInput!]!
+  audience: DutyAudienceInput!
+}
+
+input DutyDayInput {
+  """Entrada."""
+  startsAt: DateTime!
+
+  """Saída."""
+  endsAt: DateTime!
+}
+
+input DutyAudienceInput {
+  kind: DutyAudienceKind!
+  sections: [Section!]! = []
+  userIds: [ID!]! = []
+}
+
+input CancelDutyScheduleInput {
+  reason: String!
+}
+
+input SubmitEnrollmentInput {
+  formToken: String!
+  data: EnrollmentDataInput!
+
+  """Aceite do uso dos dados (LGPD)."""
+  consent: Boolean!
+
+  """Foto de perfil em base64 (JPEG, PNG ou WebP, até 2 MB)."""
+  photo: String
+}
+
+"""Dados do cadastro (formulário ou correção)."""
+input EnrollmentDataInput {
+  fullName: String!
+  email: String!
+  phone: String!
+  military: Boolean!
+  militaryId: String
+  rank: Rank
+  warName: String!
+  instruments: [EnrollmentInstrumentInput!]!
+}
+
+input EnrollmentInstrumentInput {
+  instrumentId: ID!
+  primary: Boolean!
+}
+
+input CreateEnrollmentInviteInput {
+  label: String!
+
+  """Validade em dias (1 a 30)."""
+  validDays: Int!
+}
+
 input EventInput {
   title: String!
   type: EventType!
@@ -1099,15 +1551,18 @@ input EventInput {
   requester: String
   documentRef: String
   notes: String
-}
 
-input SetlistInput {
-  items: [SetlistItemInput!]!
+  """Lista de músicas salva com o evento; vazio = mantém a atual."""
+  setlist: [SetlistItemInput!]
 }
 
 input SetlistItemInput {
   songId: ID!
   notes: String
+}
+
+input SetlistInput {
+  items: [SetlistItemInput!]!
 }
 
 input VenueInput {
@@ -1223,6 +1678,9 @@ input MemberProfileInput {
   status: MemberStatus!
   notes: String
   instruments: [MemberInstrumentInput!]!
+
+  """Funções na banda; ausente = mantém as atuais."""
+  functionIds: [ID!]
 }
 
 input MemberInstrumentInput {
@@ -1274,7 +1732,9 @@ input RosterInput {
 
 input AssignmentInput {
   userId: ID!
-  role: AssignmentRole!
+
+  """Função na banda; vazio = músico."""
+  functionId: ID
   instrumentId: ID
   notes: String
   overrideReason: String

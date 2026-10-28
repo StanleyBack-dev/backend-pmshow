@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuditModule } from "@/modules/audit/audit.module";
+import { BandFunctionsModule } from "@/modules/band-functions/band-functions.module";
 import { IdentityModule } from "@/modules/identity/identity.module";
 import { INSTRUMENT_REPOSITORY } from "@/modules/members/application/ports/instrument-repository.port";
 import { MEMBER_REPOSITORY } from "@/modules/members/application/ports/member-repository.port";
@@ -8,6 +9,7 @@ import { InstrumentsUseCase } from "@/modules/members/application/use-cases/inst
 import { MembersUseCase } from "@/modules/members/application/use-cases/members.use-cases";
 import {
   InstrumentOrmEntity,
+  MemberFunctionOrmEntity,
   MemberInstrumentOrmEntity,
   MemberOrmEntity,
 } from "@/modules/members/infrastructure/persistence/typeorm/entities/member.orm-entity";
@@ -23,9 +25,11 @@ import { MembersResolver } from "@/modules/members/presentation/graphql/members.
       MemberOrmEntity,
       InstrumentOrmEntity,
       MemberInstrumentOrmEntity,
+      MemberFunctionOrmEntity,
     ]),
     IdentityModule,
     AuditModule,
+    BandFunctionsModule,
   ],
   providers: [
     MembersUseCase,
@@ -34,6 +38,6 @@ import { MembersResolver } from "@/modules/members/presentation/graphql/members.
     { provide: MEMBER_REPOSITORY, useClass: MemberTypeormRepository },
     { provide: INSTRUMENT_REPOSITORY, useClass: InstrumentTypeormRepository },
   ],
-  exports: [MembersUseCase],
+  exports: [MembersUseCase, InstrumentsUseCase],
 })
 export class MembersModule {}

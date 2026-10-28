@@ -2,6 +2,7 @@ import {
   Field,
   ID,
   InputType,
+  Int,
   ObjectType,
   registerEnumType,
 } from "@nestjs/graphql";
@@ -43,6 +44,36 @@ export class InstrumentType {
   archived!: boolean;
 }
 
+@ObjectType("InstrumentListItem")
+export class InstrumentListItemType extends InstrumentType {
+  @Field(() => Int, { description: "Integrantes com este instrumento." })
+  memberCount!: number;
+}
+
+export const InstrumentPage = Paginated(
+  InstrumentListItemType,
+  "InstrumentPage",
+);
+
+@InputType()
+export class InstrumentFilterInput {
+  @Field({ nullable: true, description: "Parte do nome." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  search?: string;
+
+  @Field(() => Section, { nullable: true })
+  @IsOptional()
+  @IsEnum(Section)
+  section?: Section;
+
+  @Field({ nullable: true, description: "Arquivados (padrão: ativos)." })
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
+}
+
 @ObjectType("MemberInstrument")
 export class MemberInstrumentType {
   @Field(() => ID)
@@ -53,6 +84,15 @@ export class MemberInstrumentType {
 
   @Field()
   primary!: boolean;
+}
+
+@ObjectType("MemberFunction")
+export class MemberFunctionType {
+  @Field(() => ID)
+  functionId!: string;
+
+  @Field()
+  name!: string;
 }
 
 @ObjectType("MemberProfile", {
@@ -88,6 +128,9 @@ export class MemberProfileType {
 
   @Field(() => [MemberInstrumentType])
   instruments!: MemberInstrumentType[];
+
+  @Field(() => [MemberFunctionType])
+  functions!: MemberFunctionType[];
 
   @Field()
   updatedAt!: Date;
@@ -137,6 +180,11 @@ export class RosterFilterInput {
   @IsOptional()
   @IsUUID()
   instrumentId?: string;
+
+  @Field(() => ID, { nullable: true })
+  @IsOptional()
+  @IsUUID()
+  functionId?: string;
 
   @Field({
     nullable: true,
@@ -201,6 +249,16 @@ export class MemberProfileInput {
   @ValidateNested({ each: true })
   @Type(() => MemberInstrumentInput)
   instruments!: MemberInstrumentInput[];
+
+  @Field(() => [ID], {
+    nullable: true,
+    description: "Funções na banda; ausente = mantém as atuais.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsUUID("4", { each: true })
+  functionIds?: string[];
 }
 
 @InputType()

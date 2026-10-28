@@ -8,6 +8,8 @@ export enum EventType {
   FORMATURA = "FORMATURA",
   ENSAIO = "ENSAIO",
   CULTO_MISSA = "CULTO_MISSA",
+  /** A working day (expediente), created in batches from "Escalas". */
+  EXPEDIENTE = "EXPEDIENTE",
   OUTRO = "OUTRO",
 }
 

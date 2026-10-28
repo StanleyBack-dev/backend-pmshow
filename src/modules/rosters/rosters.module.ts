@@ -3,7 +3,9 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { AccessControlModule } from "@/modules/access-control/access-control.module";
 import { AuditModule } from "@/modules/audit/audit.module";
 import { AvailabilityModule } from "@/modules/availability/availability.module";
+import { BandFunctionsModule } from "@/modules/band-functions/band-functions.module";
 import { EventsModule } from "@/modules/events/events.module";
+import { IdentityModule } from "@/modules/identity/identity.module";
 import { MembersModule } from "@/modules/members/members.module";
 import { OutboxModule } from "@/modules/outbox/outbox.module";
 import { ROSTER_REPOSITORY } from "@/modules/rosters/application/ports/roster-repository.port";
@@ -29,7 +31,9 @@ import { InternalRostersController } from "@/modules/rosters/presentation/rest/i
     AccessControlModule,
     AuditModule,
     AvailabilityModule,
+    BandFunctionsModule,
     EventsModule,
+    IdentityModule,
     MembersModule,
     OutboxModule,
   ],

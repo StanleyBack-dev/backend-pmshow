@@ -56,14 +56,6 @@ export type TemporaryAccess = {
   emailSent: boolean;
 };
 
-const snapshot = (user: User) => ({
-  name: user.name,
-  email: user.email,
-  username: user.username,
-  group: user.group,
-  active: user.active,
-});
-
 // Shared checks for every operation an admin performs on another user.
 @Injectable()
 export class UserManagementPolicy {
@@ -194,13 +186,11 @@ export class ManageUsersUseCase {
     );
     const emailSent = await this.notifier.accessCreated(created, temporary);
 
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "user.created",
       entity: "user",
       entityId: created.id,
-      after: snapshot(created),
+      created: true,
     });
     return {
       user: await this.reload(created.id),
@@ -244,17 +234,13 @@ export class ManageUsersUseCase {
       userId,
     );
 
-    const updated = await this.users.update(userId, patch);
+    await this.users.update(userId, patch);
     if (groupChanged) await this.permissions.resetToGroupDefaults(userId);
 
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "user.updated",
       entity: "user",
       entityId: userId,
-      before: snapshot(target),
-      after: snapshot(updated),
     });
     return this.reload(userId);
   }
@@ -275,10 +261,8 @@ export class ManageUsersUseCase {
     if (!active) {
       await this.sessions.revokeAllForUser(userId, this.clock.now());
     }
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: active ? "user.activated" : "user.deactivated",
       entity: "user",
       entityId: userId,
     });
@@ -295,10 +279,8 @@ export class ManageUsersUseCase {
       target,
       temporary,
     );
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "user.password_reset",
       entity: "user",
       entityId: userId,
     });
@@ -312,10 +294,8 @@ export class ManageUsersUseCase {
   async unlock(actor: AuthenticatedUser, userId: string): Promise<UserAccount> {
     await this.policy.loadManageable(actor, userId);
     await this.credentials.update(userId, UNLOCKED);
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "user.unlocked",
       entity: "user",
       entityId: userId,
     });
@@ -328,10 +308,8 @@ export class ManageUsersUseCase {
   ): Promise<UserAccount> {
     await this.policy.loadManageable(actor, userId);
     await this.sessions.revokeAllForUser(userId, this.clock.now());
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "user.sessions_revoked",
       entity: "user",
       entityId: userId,
     });
@@ -371,17 +349,12 @@ export class UserPermissionsUseCase {
     desired: Permission[] | null,
   ): Promise<PermissionMatrix> {
     const target = await this.policy.loadManageable(actor, userId);
-    const before = await this.permissions.matrixFor(target);
     const after = await this.permissions.replace(target, desired);
 
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "user.permissions_changed",
       entity: "user",
       entityId: userId,
-      before: { effective: before.effective },
-      after: { effective: after.effective },
     });
     return after;
   }

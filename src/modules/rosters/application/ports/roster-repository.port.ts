@@ -1,4 +1,5 @@
 import type { OutboxDraft } from "@/modules/outbox/domain/outbox";
+import type { PageRequest, Paginated } from "@/shared/application/pagination";
 import type {
   AckStatus,
   Assignment,
@@ -10,6 +11,9 @@ import type {
 export type BusyEntry = { userId: string; eventId: string; title: string };
 
 export type EventAssignment = Assignment & { eventId: string };
+
+/** The tabs of "Minhas escalas": events by answer, and working days. */
+export type MyAssignmentTab = "pending" | "acknowledged" | "duty";
 
 export type RosterState = {
   status: RosterStatus;
@@ -37,7 +41,7 @@ export interface RosterRepositoryPort {
   setAck(
     eventId: string,
     userId: string,
-    ack: { status: AckStatus; note: string | null; at: Date },
+    ack: { status: AckStatus; note: string | null; at: Date | null },
     notifications: readonly OutboxDraft[],
   ): Promise<void>;
   /**
@@ -50,11 +54,44 @@ export interface RosterRepositoryPort {
     excludeEventId: string,
     defaultDurationMs: number,
   ): Promise<BusyEntry[]>;
-  /** The user's lines on published rosters of events starting after `from`. */
+  /**
+   * The user's lines on published rosters of events starting after `from`;
+   * `acknowledged` true keeps only "ciente", false everything else.
+   */
   publishedAssignmentsOf(
     userId: string,
     from: Date,
+    acknowledged?: boolean,
   ): Promise<EventAssignment[]>;
+  /** Same lines, one page at a time (by start, soonest first). */
+  publishedAssignmentsPage(
+    userId: string,
+    from: Date,
+    tab: MyAssignmentTab,
+    page: PageRequest,
+  ): Promise<Paginated<EventAssignment>>;
+  /** Many new rosters (and their lines) in one transaction. */
+  createMany(
+    rosters: readonly { eventId: string; state: RosterState }[],
+  ): Promise<void>;
+  /** The user's line on the published roster of each of these events. */
+  publishedLinesOn(
+    userId: string,
+    eventIds: readonly string[],
+  ): Promise<Map<string, Assignment>>;
+  /**
+   * Open swap requests: lines asking to be replaced on published rosters of
+   * planned/confirmed events starting after `from` (soonest first).
+   */
+  swapRequestsPage(
+    from: Date,
+    page: PageRequest,
+  ): Promise<Paginated<EventAssignment>>;
+  /** How many of those lines each tab has. */
+  publishedAssignmentCounts(
+    userId: string,
+    from: Date,
+  ): Promise<Record<MyAssignmentTab, number>>;
 }
 
 export const ROSTER_REPOSITORY = Symbol("ROSTER_REPOSITORY");

@@ -2,6 +2,7 @@ import { Inject, Injectable, type OnModuleInit } from "@nestjs/common";
 import type { AuthenticatedUser } from "@/common/auth/authenticated-user";
 import { APP_ERRORS } from "@/common/exceptions/app-errors.catalog";
 import { AppException } from "@/common/exceptions/app-exception";
+import { UserGroup } from "@/modules/access-control/domain/user-group";
 import { AuditTrailService } from "@/modules/audit/application/audit-trail.service";
 import { AbsencesUseCase } from "@/modules/availability/application/absences.use-cases";
 import type { AbsenceType } from "@/modules/availability/domain/absence";
@@ -11,10 +12,16 @@ import {
 } from "@/modules/events/application/event-changes";
 import { EventsUseCase } from "@/modules/events/application/events.use-cases";
 import { VenuesUseCase } from "@/modules/events/application/venues.use-cases";
-import { EventStatus, type BandEvent } from "@/modules/events/domain/event";
+import {
+  EventStatus,
+  EventType,
+  type BandEvent,
+} from "@/modules/events/domain/event";
+import { UserLookupService } from "@/modules/identity/application/user-lookup.service";
 import { MembersUseCase } from "@/modules/members/application/use-cases/members.use-cases";
 import {
   MemberStatus,
+  type MemberFunction,
   type MemberInstrument,
   type Rank,
   type Section,
@@ -29,11 +36,13 @@ import type {
 import {
   ROSTER_REPOSITORY,
   type EventAssignment,
+  type MyAssignmentTab,
   type RosterRepositoryPort,
   type RosterSummary,
 } from "@/modules/rosters/application/ports/roster-repository.port";
 import {
   rosterNotice,
+  swapDeclinedNotice,
   swapRequestNotice,
   type NoticeContext,
   type NoticeKind,
@@ -58,16 +67,21 @@ import {
   type CandidateFacts,
   type Roster,
 } from "@/modules/rosters/domain/roster";
+import type { PageRequest, Paginated } from "@/shared/application/pagination";
 import { CLOCK, type ClockPort } from "@/shared/application/ports/clock.port";
+import { BandFunctionsUseCase } from "@/modules/band-functions/application/band-functions.use-cases";
 
 export type Candidate = {
   userId: string;
   name: string;
   warName: string;
   rank: Rank;
+  registration: string | null;
+  phone: string | null;
   section: Section;
   memberStatus: MemberStatus;
   instruments: MemberInstrument[];
+  functions: MemberFunction[];
   blocker: Blocker | null;
   absence: { type: AbsenceType; startsOn: string; endsOn: string } | null;
   busyWith: { eventId: string; title: string }[];
@@ -98,6 +112,8 @@ export class RostersUseCase implements OnModuleInit {
     private readonly audit: AuditTrailService,
     private readonly outbox: OutboxDispatcher,
     private readonly handlers: OutboxHandlers,
+    private readonly functions: BandFunctionsUseCase,
+    private readonly users: UserLookupService,
   ) {}
 
   /** Status and size of the rosters of these events (lists of events). */
@@ -122,12 +138,22 @@ export class RostersUseCase implements OnModuleInit {
   ): Promise<RosterView | null> {
     const roster = await this.rosters.find(eventId);
     if (!roster) return null;
-    const visible =
-      canReadAll ||
-      (roster.status === RosterStatus.PUBLICADA &&
-        roster.assignments.some((item) => item.userId === viewer.id));
-    if (!visible) return null;
-    return { ...roster, uncoveredSections: await this.uncovered(roster) };
+    // Published rosters: the whole band sees who goes (names, function and
+    // "ciente"); drafts only who sees every roster.
+    if (!canReadAll && roster.status !== RosterStatus.PUBLICADA) return null;
+    const visible = canReadAll
+      ? roster
+      : {
+          ...roster,
+          // Someone else's swap reason or conflict justification is for the
+          // managers; each member keeps their own.
+          assignments: roster.assignments.map((item) =>
+            item.userId === viewer.id
+              ? item
+              : { ...item, ackNote: null, overrideReason: null },
+          ),
+        };
+    return { ...visible, uncoveredSections: await this.uncovered(roster) };
   }
 
   /** Everyone who could go, with what blocks or warns about each one. */
@@ -136,10 +162,49 @@ export class RostersUseCase implements OnModuleInit {
     return this.candidatesFor(event);
   }
 
-  myAssignments(userId: string): Promise<EventAssignment[]> {
-    // Started up to 12 h ago still shows (the event may be happening).
-    const from = new Date(this.clock.now().getTime() - 12 * 3_600_000);
-    return this.rosters.publishedAssignmentsOf(userId, from);
+  myAssignments(
+    userId: string,
+    acknowledged?: boolean,
+  ): Promise<EventAssignment[]> {
+    return this.rosters.publishedAssignmentsOf(
+      userId,
+      this.myAssignmentsFrom(),
+      acknowledged,
+    );
+  }
+
+  /** The user's line on each of these events (published rosters only). */
+  myLinesOn(
+    userId: string,
+    eventIds: readonly string[],
+  ): Promise<Map<string, Assignment>> {
+    return this.rosters.publishedLinesOn(userId, eventIds);
+  }
+
+  /** "Minhas escalas": one tab, one page at a time. */
+  myAssignmentsPage(
+    userId: string,
+    tab: MyAssignmentTab,
+    page: PageRequest,
+  ): Promise<Paginated<EventAssignment>> {
+    return this.rosters.publishedAssignmentsPage(
+      userId,
+      this.myAssignmentsFrom(),
+      tab,
+      page,
+    );
+  }
+
+  myAssignmentCounts(userId: string): Promise<Record<MyAssignmentTab, number>> {
+    return this.rosters.publishedAssignmentCounts(
+      userId,
+      this.myAssignmentsFrom(),
+    );
+  }
+
+  // Started up to 12 h ago still shows (the event may be happening).
+  private myAssignmentsFrom(): Date {
+    return new Date(this.clock.now().getTime() - 12 * 3_600_000);
   }
 
   async save(
@@ -155,7 +220,12 @@ export class RostersUseCase implements OnModuleInit {
 
     const candidates = await this.candidatesFor(event);
     const byUser = new Map(candidates.map((item) => [item.userId, item]));
-    const problems = checkAssignments(lines, this.factsOf(candidates));
+    const functionNames = await this.functionNames();
+    const problems = checkAssignments(
+      lines,
+      this.factsOf(candidates),
+      new Set(functionNames.keys()),
+    );
     if (problems.length > 0) throw this.problemError(problems, byUser);
 
     const current = await this.rosters.find(eventId);
@@ -171,9 +241,9 @@ export class RostersUseCase implements OnModuleInit {
     // Published: tell only the people the change affects.
     const notices: OutboxDraft[] = [];
     if (published && !isEmptyDiff(diff)) {
-      const context = await this.noticeContext(event);
+      const context = await this.noticeContext(event, actor);
       const lineOf = (userId: string) =>
-        this.noticeLine(assignments, byUser, userId);
+        this.noticeLine(assignments, byUser, userId, functionNames);
       const notify = (kind: NoticeKind, userIds: string[]) =>
         userIds.forEach((userId) =>
           notices.push(
@@ -201,29 +271,77 @@ export class RostersUseCase implements OnModuleInit {
     );
     if (notices.length > 0) this.outbox.kick();
 
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: current ? "roster.updated" : "roster.created",
       entity: "roster",
       entityId: eventId,
-      after: {
-        status: roster.status,
-        assignments: assignments.length,
-        ...diff,
-        // A conflict accepted on purpose is part of the record.
-        overrides: lines
-          .filter(
-            (line) =>
-              line.overrideReason && byUser.get(line.userId)?.busyWith.length,
-          )
-          .map((line) => ({
-            userId: line.userId,
-            reason: line.overrideReason,
-          })),
-      },
+      created: !current,
     });
     return { ...roster, uncoveredSections: await this.uncovered(roster) };
+  }
+
+  /**
+   * The rosters of working days (expediente), already published, in one go.
+   * Nobody is asked to acknowledge them and nobody is notified here: the
+   * batch sends one notice per person. Whoever has an approved absence on a
+   * day is left out of that day. Returns who is on each event.
+   */
+  async assignDutyMany(
+    actor: AuthenticatedUser,
+    events: readonly BandEvent[],
+    input: readonly AssignmentInput[],
+  ): Promise<Map<string, string[]>> {
+    const lines = normalizeAssignments(input);
+    const days = events.map((event) => ({
+      event,
+      day: this.clock.localDate(event.startsAt),
+    }));
+    const sorted = days.map((item) => item.day).sort();
+    const absences =
+      sorted.length > 0
+        ? await this.absences.approvedDuring(
+            lines.map((line) => line.userId),
+            { startsOn: sorted[0]!, endsOn: sorted[sorted.length - 1]! },
+          )
+        : [];
+    const away = (userId: string, day: string) =>
+      absences.some(
+        (item) =>
+          item.userId === userId && item.startsOn <= day && item.endsOn >= day,
+      );
+
+    const publishedAt = this.clock.now();
+    const people = new Map<string, string[]>();
+    const rosters = days.map(({ event, day }) => {
+      const onDay = lines.filter((line) => !away(line.userId, day));
+      people.set(
+        event.id,
+        onDay.map((line) => line.userId),
+      );
+      return {
+        eventId: event.id,
+        state: {
+          status: RosterStatus.PUBLICADA,
+          version: 1,
+          publishedAt,
+          publishedBy: actor.id,
+          assignments: onDay.map((line) => ({
+            ...line,
+            ackStatus: AckStatus.CIENTE,
+            ackNote: null,
+            ackAt: null,
+          })),
+        },
+      };
+    });
+    await this.rosters.createMany(rosters);
+    await this.audit.stampMany({
+      actorId: actor.id,
+      entity: "roster",
+      entityIds: events.map((event) => event.id),
+      created: true,
+    });
+    return people;
   }
 
   async publish(
@@ -241,21 +359,28 @@ export class RostersUseCase implements OnModuleInit {
 
     const candidates = await this.candidatesFor(event);
     const byUser = new Map(candidates.map((item) => [item.userId, item]));
+    const functionNames = await this.functionNames();
     // Something may have changed since the draft was saved (new absence…).
     const problems = checkAssignments(
       current.assignments,
       this.factsOf(candidates),
+      new Set(functionNames.keys()),
     ).filter((problem) => problem.kind === "blocked");
     if (problems.length > 0) throw this.problemError(problems, byUser);
 
     const version = current.version + 1;
-    const context = await this.noticeContext(event);
+    const context = await this.noticeContext(event, actor);
     const notices = current.assignments.map((item) =>
       deliveryDraft(
         rosterNotice(
           "published",
           item.userId,
-          this.noticeLine(current.assignments, byUser, item.userId),
+          this.noticeLine(
+            current.assignments,
+            byUser,
+            item.userId,
+            functionNames,
+          ),
           context,
         ),
         `roster:${eventId}:v${version}:${item.userId}`,
@@ -274,13 +399,10 @@ export class RostersUseCase implements OnModuleInit {
     );
     this.outbox.kick();
 
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "roster.published",
       entity: "roster",
       entityId: eventId,
-      after: { assignments: roster.assignments.length },
     });
     return { ...roster, uncoveredSections: await this.uncovered(roster) };
   }
@@ -311,23 +433,26 @@ export class RostersUseCase implements OnModuleInit {
 
     const at = this.clock.now();
     const notices: OutboxDraft[] = [];
-    if (
-      status === AckStatus.TROCA_SOLICITADA &&
-      roster.publishedBy &&
-      roster.publishedBy !== actor.id
-    ) {
-      const member =
-        (await this.members.profileOf(actor.id))?.warName ?? actor.name;
-      notices.push(
-        deliveryDraft(
-          swapRequestNotice(roster.publishedBy, member, reason as string, {
-            event,
-            venue: null,
-            timeZone: this.clock.timeZone,
-          }),
-          `swap:${eventId}:${actor.id}:${at.getTime()}`,
-        ),
+    if (status === AckStatus.TROCA_SOLICITADA) {
+      // Every manager (Gestor) and whoever published: anyone can solve it.
+      const managers = new Set(
+        await this.users.activeUserIdsInGroup(UserGroup.ADMIN),
       );
+      if (roster.publishedBy) managers.add(roster.publishedBy);
+      managers.delete(actor.id);
+      const member = (await this.members.signatureOf(actor)) ?? actor.name;
+      for (const managerId of managers) {
+        notices.push(
+          deliveryDraft(
+            swapRequestNotice(managerId, member, reason as string, {
+              event,
+              venue: null,
+              timeZone: this.clock.timeZone,
+            }),
+            `swap:${eventId}:${actor.id}:${at.getTime()}:${managerId}`,
+          ),
+        );
+      }
     }
     await this.rosters.setAck(
       eventId,
@@ -337,15 +462,71 @@ export class RostersUseCase implements OnModuleInit {
     );
     if (notices.length > 0) this.outbox.kick();
 
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "roster.acknowledged",
       entity: "roster",
       entityId: eventId,
-      after: { status, note: reason },
     });
     return { ...line, ackStatus: status, ackNote: reason, ackAt: at };
+  }
+
+  /** Open swap requests of upcoming events (managers answer them). */
+  swapRequests(page: PageRequest): Promise<Paginated<EventAssignment>> {
+    return this.rosters.swapRequestsPage(this.myAssignmentsFrom(), page);
+  }
+
+  /**
+   * The manager keeps the person on the roster (does not accept the swap):
+   * the line goes back to waiting for their "ciente", and they are told why.
+   */
+  async keepOnRoster(
+    actor: AuthenticatedUser,
+    eventId: string,
+    userId: string,
+    note: string | null,
+  ): Promise<Assignment> {
+    // Like absences: nobody answers their own request.
+    if (userId === actor.id) {
+      throw AppException.from(APP_ERRORS.rosters.selfSwapReview, undefined);
+    }
+    const event = await this.openEvent(eventId);
+    const roster = await this.rosters.find(eventId);
+    const line = roster?.assignments.find((item) => item.userId === userId);
+    if (
+      roster?.status !== RosterStatus.PUBLICADA ||
+      line?.ackStatus !== AckStatus.TROCA_SOLICITADA
+    ) {
+      throw AppException.from(APP_ERRORS.rosters.noSwapRequest, undefined);
+    }
+    const text = note?.trim() || null;
+    const by = (await this.members.signatureOf(actor)) ?? actor.name;
+    await this.rosters.setAck(
+      eventId,
+      userId,
+      { status: AckStatus.PENDENTE, note: null, at: null },
+      [
+        deliveryDraft(
+          swapDeclinedNotice(userId, by, text, {
+            event,
+            venue: null,
+            timeZone: this.clock.timeZone,
+          }),
+          `swap-declined:${eventId}:${userId}:${this.clock.now().getTime()}`,
+        ),
+      ],
+    );
+    this.outbox.kick();
+    await this.audit.stamp({
+      actorId: actor.id,
+      entity: "roster",
+      entityId: eventId,
+    });
+    return {
+      ...line,
+      ackStatus: AckStatus.PENDENTE,
+      ackNote: null,
+      ackAt: null,
+    };
   }
 
   /**
@@ -365,9 +546,12 @@ export class RostersUseCase implements OnModuleInit {
     });
 
     let band: Awaited<ReturnType<MembersUseCase["bandMembers"]>> | null = null;
+    let functionNames: Map<string, string> | null = null;
     let remindedEvents = 0;
     const drafts: OutboxDraft[] = [];
     for (const event of events) {
+      // Working days come in batches the musicians already have.
+      if (event.type === EventType.EXPEDIENTE) continue;
       const kind = reminderFor(
         {
           startsOnDay: this.clock.localDate(event.startsAt),
@@ -381,6 +565,7 @@ export class RostersUseCase implements OnModuleInit {
       if (roster.assignments.length === 0) continue;
 
       band ??= await this.members.bandMembers();
+      functionNames ??= await this.functionNames();
       const byUser = new Map(
         band.map((entry) => [
           entry.userId,
@@ -395,7 +580,12 @@ export class RostersUseCase implements OnModuleInit {
             rosterNotice(
               kind === "today" ? "reminder-today" : "reminder-tomorrow",
               item.userId,
-              this.noticeLine(roster.assignments, byUser, item.userId),
+              this.noticeLine(
+                roster.assignments,
+                byUser,
+                item.userId,
+                functionNames,
+              ),
               context,
             ),
             `reminder:${event.id}:${item.userId}:${kind}:${today}`,
@@ -417,11 +607,12 @@ export class RostersUseCase implements OnModuleInit {
 
   /** Outbox handler: tell everyone on a published roster about the change. */
   private async onEventChanged(message: OutboxMessage): Promise<void> {
-    const { eventId, change } = message.payload as unknown as EventChange;
+    const { eventId, change, actorId } =
+      message.payload as unknown as EventChange;
     const roster = await this.rosters.find(eventId);
     if (roster?.status !== RosterStatus.PUBLICADA) return;
     const event = await this.events.get(eventId);
-    const context = await this.noticeContext(event);
+    const context = await this.noticeContext(event, actorId ?? null);
     const candidates = await this.members.bandMembers();
     const byUser = new Map(
       candidates.map((entry) => [
@@ -429,6 +620,7 @@ export class RostersUseCase implements OnModuleInit {
         { instruments: entry.profile?.instruments ?? [] },
       ]),
     );
+    const functionNames = await this.functionNames();
     const kind: NoticeKind =
       change === "CANCELLED" ? "cancelled" : "rescheduled";
     await this.outbox.enqueue(
@@ -437,7 +629,12 @@ export class RostersUseCase implements OnModuleInit {
           rosterNotice(
             kind,
             item.userId,
-            this.noticeLine(roster.assignments, byUser, item.userId),
+            this.noticeLine(
+              roster.assignments,
+              byUser,
+              item.userId,
+              functionNames,
+            ),
             context,
           ),
           // A retried handler does not notify twice.
@@ -483,9 +680,12 @@ export class RostersUseCase implements OnModuleInit {
         name: entry.name,
         warName: profile.warName,
         rank: profile.rank,
+        registration: profile.registration,
+        phone: profile.phone,
         section: profile.section,
         memberStatus: profile.status,
         instruments: profile.instruments,
+        functions: profile.functions,
         blocker: blockerOf(facts),
         absence: absence && {
           type: absence.type,
@@ -528,7 +728,9 @@ export class RostersUseCase implements OnModuleInit {
     const reason =
       first.kind === "blocked"
         ? `${name(first.userId)} ${BLOCKER_TEXT[first.blocker]}.`
-        : `${name(first.userId)} não toca o instrumento escolhido (veja o cadastro do músico).`;
+        : first.kind === "unknown-function"
+          ? `A função escolhida para ${name(first.userId)} não existe mais.`
+          : `${name(first.userId)} não toca o instrumento escolhido (veja o cadastro do músico).`;
     return AppException.from(
       APP_ERRORS.rosters.invalidAssignment,
       { reason },
@@ -544,13 +746,23 @@ export class RostersUseCase implements OnModuleInit {
     return event;
   }
 
-  private async noticeContext(event: BandEvent): Promise<NoticeContext> {
-    const venue = event.venueId
-      ? ((await this.venues.findMany([event.venueId]))[0] ?? null)
-      : null;
+  /** `by`: who made the change (signed in the notice); null = automatic. */
+  private async noticeContext(
+    event: BandEvent,
+    by: AuthenticatedUser | string | null = null,
+  ): Promise<NoticeContext> {
+    const [venue, signature] = await Promise.all([
+      event.venueId
+        ? this.venues
+            .findMany([event.venueId])
+            .then((venues) => venues[0] ?? null)
+        : null,
+      by ? this.members.signatureOf(by) : null,
+    ]);
     return {
       event,
       venue,
+      by: signature,
       timeZone: this.clock.timeZone,
       // Seconds since epoch: grows with every notice about this event.
       sequence: Math.floor(this.clock.now().getTime() / 1000),
@@ -561,13 +773,25 @@ export class RostersUseCase implements OnModuleInit {
     assignments: readonly Assignment[],
     byUser: ReadonlyMap<string, { instruments: MemberInstrument[] }>,
     userId: string,
+    functionNames: ReadonlyMap<string, string>,
   ) {
     const line = assignments.find((item) => item.userId === userId);
     if (!line) return null;
     const instrument = byUser
       .get(userId)
       ?.instruments.find((item) => item.instrumentId === line.instrumentId);
-    return { role: line.role, instrumentName: instrument?.name ?? null };
+    return {
+      functionName: line.functionId
+        ? (functionNames.get(line.functionId) ?? null)
+        : null,
+      instrumentName: instrument?.name ?? null,
+    };
+  }
+
+  /** Every function by id (archived too: old lines keep their name). */
+  private async functionNames(): Promise<Map<string, string>> {
+    const all = await this.functions.list(true);
+    return new Map(all.map((item) => [item.id, item.name]));
   }
 
   private async uncovered(roster: Roster): Promise<Section[]> {

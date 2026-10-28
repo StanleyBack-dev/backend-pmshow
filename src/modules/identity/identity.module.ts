@@ -115,6 +115,9 @@ import { MailModule } from "@/modules/mails/mail.module";
     FirstAccessGuard,
     UserLookupService,
     IdentityMaintenanceService,
+    // Enrollment approval creates the account through the regular flow.
+    ManageUsersUseCase,
+    SECRETS,
   ],
 })
 export class IdentityModule implements OnApplicationBootstrap {
