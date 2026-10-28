@@ -18,6 +18,7 @@ import { ArtistsModule } from "@/modules/artists/artists.module";
 import { AuditModule } from "@/modules/audit/audit.module";
 import { AvailabilityModule } from "@/modules/availability/availability.module";
 import { BroadcastsModule } from "@/modules/broadcasts/broadcasts.module";
+import { SupportModule } from "@/modules/support/support.module";
 import { DashboardModule } from "@/modules/dashboard/dashboard.module";
 import { IdentityModule } from "@/modules/identity/identity.module";
 import { FirstAccessGuard } from "@/modules/identity/presentation/guards/first-access.guard";
@@ -59,6 +60,7 @@ import { SharedModule } from "@/shared/shared.module";
     RostersModule,
     DutySchedulesModule,
     BroadcastsModule,
+    SupportModule,
     DashboardModule,
     MaintenanceModule,
   ],

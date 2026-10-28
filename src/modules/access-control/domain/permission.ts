@@ -19,6 +19,8 @@ export enum Permission {
   USERS_MANAGE = "USERS_MANAGE",
   PERMISSIONS_MANAGE = "PERMISSIONS_MANAGE",
   AUDIT_READ = "AUDIT_READ",
+  /** Answer and close the app's support requests. */
+  SUPPORT_MANAGE = "SUPPORT_MANAGE",
 }
 
 export const ALL_PERMISSIONS: readonly Permission[] = Object.values(Permission);

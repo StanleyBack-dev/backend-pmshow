@@ -24,6 +24,12 @@ export enum NotificationType {
   EVENT_REMINDER = "EVENT_REMINDER",
   /** A manager's announcement (comunicado). */
   BROADCAST = "BROADCAST",
+  /** For ADMIN_MASTER: someone asked the app's support. */
+  SUPPORT_REQUESTED = "SUPPORT_REQUESTED",
+  /** Your support request was answered. */
+  SUPPORT_ANSWERED = "SUPPORT_ANSWERED",
+  /** Your support request was closed. */
+  SUPPORT_FINALIZED = "SUPPORT_FINALIZED",
   /** For ADMIN_MASTER: a sign-up from the public link awaits review. */
   ENROLLMENT_SUBMITTED = "ENROLLMENT_SUBMITTED",
 }

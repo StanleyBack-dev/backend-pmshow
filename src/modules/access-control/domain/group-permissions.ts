@@ -46,7 +46,8 @@ export const GROUP_DEFAULT_PERMISSIONS: Record<
 // Only ever granted by the group: a per-user override can neither grant nor
 // revoke them. Accounts, sign-ups, permissions and record history stay with
 // ADMIN_MASTER; the band's personal data (Músicos) with ADMIN and
-// ADMIN_MASTER; asking for an absence only with the musicians.
+// ADMIN_MASTER; asking for an absence only with the musicians; answering
+// support requests only with ADMIN_MASTER.
 export const LOCKED_PERMISSIONS: ReadonlySet<Permission> = new Set([
   Permission.ABSENCES_REQUEST,
   Permission.USERS_MANAGE,
@@ -54,4 +55,5 @@ export const LOCKED_PERMISSIONS: ReadonlySet<Permission> = new Set([
   Permission.AUDIT_READ,
   Permission.MEMBERS_READ,
   Permission.MEMBERS_MANAGE,
+  Permission.SUPPORT_MANAGE,
 ]);
