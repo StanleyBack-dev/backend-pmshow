@@ -25,6 +25,10 @@ export const STAMPED_TABLES = {
     table: "tb_enrollment_requests",
     key: "idtb_enrollment_requests",
   },
+  support_request: {
+    table: "tb_support_requests",
+    key: "idtb_support_requests",
+  },
 } as const;
 
 export type StampedEntity = keyof typeof STAMPED_TABLES;

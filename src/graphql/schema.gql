@@ -584,6 +584,7 @@ enum Permission {
   USERS_MANAGE
   PERMISSIONS_MANAGE
   AUDIT_READ
+  SUPPORT_MANAGE
 }
 
 type PermissionMatrix {
@@ -838,6 +839,9 @@ enum NotificationType {
   DUTY_CANCELLED
   EVENT_REMINDER
   BROADCAST
+  SUPPORT_REQUESTED
+  SUPPORT_ANSWERED
+  SUPPORT_FINALIZED
   ENROLLMENT_SUBMITTED
 }
 
@@ -1017,6 +1021,61 @@ type MyAssignmentCounts {
   duty: Int!
 }
 
+"""Solicitação de suporte."""
+type SupportRequest {
+  id: ID!
+
+  """Número do protocolo (#000042)."""
+  protocol: Int!
+  userId: ID!
+  userName: String!
+  warName: String
+  category: SupportCategory!
+  subject: String!
+  message: String!
+  status: SupportStatus!
+  reply: String
+  repliedAt: DateTime
+  repliedByName: String
+  finalizedAt: DateTime
+  finalizedByName: String
+  createdAt: DateTime!
+}
+
+"""Do que se trata a solicitação de suporte."""
+enum SupportCategory {
+  DUVIDA
+  PROBLEMA
+  ACESSO
+  SUGESTAO
+  OUTRO
+}
+
+"""Aberto → respondido → finalizado."""
+enum SupportStatus {
+  ABERTO
+  RESPONDIDO
+  FINALIZADO
+}
+
+"""Limite diário de solicitações."""
+type SupportQuota {
+  limit: Int!
+  sentToday: Int!
+  remaining: Int!
+
+  """Quando poderá enviar de novo (vazio: já pode)."""
+  nextAllowedAt: DateTime
+}
+
+type SupportRequestPage {
+  items: [SupportRequest!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
 type Query {
   """Verifica se a API GraphQL responde."""
   ping: String!
@@ -1144,6 +1203,15 @@ type Query {
   Pedidos de troca em aberto nas escalas publicadas dos próximos eventos.
   """
   swapRequests(page: PageInput): MyAssignmentPage!
+
+  """Quantas solicitações de suporte ainda posso enviar hoje."""
+  supportQuota: SupportQuota!
+
+  """Minhas solicitações de suporte, das mais recentes."""
+  mySupportRequests(page: PageInput): SupportRequestPage!
+
+  """Todas as solicitações de suporte (administração)."""
+  supportRequests(status: SupportStatus, page: PageInput): SupportRequestPage!
 }
 
 input ArtistFilterInput {
@@ -1423,6 +1491,17 @@ type Mutation {
 
   """Ciente, ou pedido de troca (com motivo)."""
   acknowledgeRoster(eventId: ID!, answer: AckAnswer!, note: String): Assignment!
+
+  """
+  Envia uma solicitação de suporte (até 3 por dia); avisa os administradores.
+  """
+  sendSupportRequest(input: SupportRequestInput!): SupportRequest!
+
+  """Responde a solicitação; quem pediu é avisado."""
+  replySupportRequest(id: ID!, reply: String!): SupportRequest!
+
+  """Finaliza a solicitação; quem pediu é avisado."""
+  finalizeSupportRequest(id: ID!): SupportRequest!
 }
 
 input ArtistInput {
@@ -1743,4 +1822,10 @@ input AssignmentInput {
 enum AckAnswer {
   CIENTE
   TROCA_SOLICITADA
+}
+
+input SupportRequestInput {
+  category: SupportCategory!
+  subject: String!
+  message: String!
 }
