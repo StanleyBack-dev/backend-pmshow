@@ -105,4 +105,9 @@ export const identityErrors = {
     status: HttpStatus.CONFLICT,
     message: "É preciso manter pelo menos um Administrador geral ativo.",
   },
+  invalidPhoto: {
+    code: "USER_INVALID_PHOTO",
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: "A foto deve ser uma imagem JPEG, PNG ou WebP de até 2 MB.",
+  },
 } as const;

@@ -44,4 +44,15 @@ export const rostersErrors = {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     message: "Informe o motivo do pedido de troca.",
   },
+  selfSwapReview: {
+    code: "ROSTER_SELF_SWAP_REVIEW",
+    status: HttpStatus.FORBIDDEN,
+    message: "Outro gestor precisa analisar o seu próprio pedido de troca.",
+  },
+  noSwapRequest: {
+    code: "ROSTER_NO_SWAP_REQUEST",
+    status: HttpStatus.CONFLICT,
+    message:
+      "Esta pessoa não tem pedido de troca em aberto nesta escala (talvez já tenha sido resolvido).",
+  },
 } as const;

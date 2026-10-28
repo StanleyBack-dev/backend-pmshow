@@ -8,10 +8,12 @@ import type {
   RosterFilter,
 } from "@/modules/members/application/ports/member-repository.port";
 import type {
+  MemberFunction,
   MemberInstrument,
   MemberProfile,
 } from "@/modules/members/domain/member";
 import {
+  MemberFunctionOrmEntity,
   MemberInstrumentOrmEntity,
   MemberOrmEntity,
 } from "@/modules/members/infrastructure/persistence/typeorm/entities/member.orm-entity";
@@ -34,6 +36,12 @@ type RosterRow = {
   status: MemberProfile["status"] | null;
   notes: string | null;
   updated_at: Date | null;
+};
+
+type FunctionRow = {
+  user_id: string;
+  function_id: string;
+  name: string;
 };
 
 type InstrumentRow = {
@@ -76,6 +84,11 @@ export class MemberTypeormRepository implements MemberRepositoryPort {
         `EXISTS (SELECT 1 FROM tb_member_instruments mi WHERE mi.idtb_users = u.idtb_users AND mi.idtb_instruments = ${param(filter.instrumentId)})`,
       );
     }
+    if (filter.functionId) {
+      where.push(
+        `EXISTS (SELECT 1 FROM tb_member_functions mf WHERE mf.idtb_users = u.idtb_users AND mf.idtb_band_functions = ${param(filter.functionId)})`,
+      );
+    }
     if (filter.withProfile !== undefined) {
       where.push(
         filter.withProfile
@@ -106,15 +119,20 @@ export class MemberTypeormRepository implements MemberRepositoryPort {
       ),
     ]);
 
-    const instruments = await this.instrumentsOf(
-      rows.filter((row) => row.war_name !== null).map((row) => row.user_id),
-    );
+    const withProfile = rows
+      .filter((row) => row.war_name !== null)
+      .map((row) => row.user_id);
+    const [instruments, functions] = await Promise.all([
+      this.instrumentsOf(withProfile),
+      this.functionsOf(withProfile),
+    ]);
     const items = rows.map((row) => ({
       userId: row.user_id,
       name: row.name,
       username: row.username,
       active: row.active,
-      profile: row.war_name === null ? null : toProfile(row, instruments),
+      profile:
+        row.war_name === null ? null : toProfile(row, instruments, functions),
     }));
     return paginate(items, counted[0]?.total ?? 0, page);
   }
@@ -127,7 +145,11 @@ export class MemberTypeormRepository implements MemberRepositoryPort {
       [userId],
     );
     if (!rows[0]) return null;
-    return toProfile(rows[0], await this.instrumentsOf([userId]));
+    const [instruments, functions] = await Promise.all([
+      this.instrumentsOf([userId]),
+      this.functionsOf([userId]),
+    ]);
+    return toProfile(rows[0], instruments, functions);
   }
 
   async findUserIdByRegistration(registration: string): Promise<string | null> {
@@ -163,6 +185,15 @@ export class MemberTypeormRepository implements MemberRepositoryPort {
           })),
         );
       }
+      if (data.functionIds !== undefined) {
+        const functions = manager.getRepository(MemberFunctionOrmEntity);
+        await functions.delete({ userId });
+        if (data.functionIds.length > 0) {
+          await functions.insert(
+            data.functionIds.map((functionId) => ({ userId, functionId })),
+          );
+        }
+      }
     });
     const saved = await this.findProfile(userId);
     if (!saved) throw new Error(`Member profile ${userId} vanished after save`);
@@ -194,11 +225,35 @@ export class MemberTypeormRepository implements MemberRepositoryPort {
     }
     return byUser;
   }
+
+  private async functionsOf(
+    userIds: string[],
+  ): Promise<Map<string, MemberFunction[]>> {
+    const byUser = new Map<string, MemberFunction[]>();
+    if (userIds.length === 0) return byUser;
+    const rows = await this.dataSource.query<FunctionRow[]>(
+      `SELECT mf.idtb_users AS user_id, f.idtb_band_functions AS function_id,
+              f.name
+         FROM tb_member_functions mf
+         JOIN tb_band_functions f
+           ON f.idtb_band_functions = mf.idtb_band_functions
+        WHERE mf.idtb_users = ANY($1::uuid[])
+        ORDER BY f.name`,
+      [userIds],
+    );
+    for (const row of rows) {
+      const list = byUser.get(row.user_id) ?? [];
+      list.push({ functionId: row.function_id, name: row.name });
+      byUser.set(row.user_id, list);
+    }
+    return byUser;
+  }
 }
 
 function toProfile(
   row: RosterRow,
   instruments: Map<string, MemberInstrument[]>,
+  functions: Map<string, MemberFunction[]>,
 ): MemberProfile {
   return {
     userId: row.user_id,
@@ -210,6 +265,7 @@ function toProfile(
     status: row.status as MemberProfile["status"],
     notes: row.notes,
     instruments: instruments.get(row.user_id) ?? [],
+    functions: functions.get(row.user_id) ?? [],
     updatedAt: row.updated_at as Date,
   };
 }

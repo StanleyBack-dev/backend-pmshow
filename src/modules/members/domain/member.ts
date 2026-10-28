@@ -28,8 +28,8 @@ export enum Section {
   PERCUSSAO = "PERCUSSAO",
   CORDAS_BASE = "CORDAS_BASE",
   VOCAL = "VOCAL",
+  /** Technical staff and support (sound, light, driver…). */
   TECNICA = "TECNICA",
-  APOIO = "APOIO",
 }
 
 export enum MemberStatus {
@@ -45,6 +45,12 @@ export type MemberInstrument = {
   primary: boolean;
 };
 
+/** A function (conductor, driver…) on the member's profile. */
+export type MemberFunction = {
+  functionId: string;
+  name: string;
+};
+
 export type MemberProfile = {
   userId: string;
   warName: string;
@@ -55,6 +61,7 @@ export type MemberProfile = {
   status: MemberStatus;
   notes: string | null;
   instruments: MemberInstrument[];
+  functions: MemberFunction[];
   updatedAt: Date;
 };
 
@@ -64,6 +71,9 @@ export type Instrument = {
   section: Section;
   archived: boolean;
 };
+
+/** An instrument in the catalog page, with how many members play it. */
+export type InstrumentListItem = Instrument & { memberCount: number };
 
 /** Digits only; accepts Brazilian landlines (10) and mobiles (11). */
 export function normalizePhone(value: string): string | null {

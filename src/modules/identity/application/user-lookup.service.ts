@@ -28,6 +28,33 @@ export class UserLookupService {
     return this.users.listActiveIds();
   }
 
+  /** Enabled accounts of one group (e.g. who reviews new sign-ups). */
+  activeUserIdsInGroup(group: UserGroup): Promise<string[]> {
+    return this.users.listActiveIds(group);
+  }
+
+  /** Whether a login name or e-mail already belongs to an account. */
+  async isTaken(input: {
+    username?: string;
+    email?: string;
+  }): Promise<boolean> {
+    const [byUsername, byEmail] = await Promise.all([
+      input.username ? this.users.findByUsername(input.username) : null,
+      input.email ? this.users.findByEmail(input.email) : null,
+    ]);
+    return Boolean(byUsername ?? byEmail);
+  }
+
+  /** Object storage key of the account's profile photo (null: none). */
+  async avatarKeyOf(id: string): Promise<string | null> {
+    return (await this.users.findById(id))?.avatarKey ?? null;
+  }
+
+  /** Profile photo of an account (key in the object storage). */
+  async setAvatarKey(id: string, avatarKey: string | null): Promise<void> {
+    await this.users.update(id, { avatarKey });
+  }
+
   async findById(id: string): Promise<UserSummary | null> {
     const user = await this.users.findById(id);
     if (!user) return null;

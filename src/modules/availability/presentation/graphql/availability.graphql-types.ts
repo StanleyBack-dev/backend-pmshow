@@ -2,12 +2,18 @@ import {
   Field,
   ID,
   InputType,
+  Int,
   ObjectType,
   registerEnumType,
 } from "@nestjs/graphql";
+import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
   IsArray,
   IsEnum,
+  IsInt,
+  Min,
+  ValidateNested,
   IsOptional,
   IsString,
   IsUUID,
@@ -18,6 +24,8 @@ import {
   AbsenceStatus,
   AbsenceType,
 } from "@/modules/availability/domain/absence";
+import { MAX_ATTACHMENTS } from "@/modules/availability/domain/absence-attachment";
+import { UploadFormType } from "@/modules/media/presentation/graphql/media.graphql-types";
 
 registerEnumType(AbsenceType, {
   name: "AbsenceType",
@@ -26,6 +34,21 @@ registerEnumType(AbsenceType, {
 registerEnumType(AbsenceStatus, { name: "AbsenceStatus" });
 
 const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+@ObjectType("AbsenceAttachment", { description: "Arquivo anexado ao pedido." })
+export class AbsenceAttachmentType {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  fileName!: string;
+
+  @Field()
+  mimeType!: string;
+
+  @Field(() => Int)
+  sizeBytes!: number;
+}
 
 @ObjectType("Absence", {
   description: "Período em que alguém não pode ser escalado.",
@@ -64,8 +87,75 @@ export class AbsenceGqlType {
   @Field(() => Date, { nullable: true })
   reviewedAt!: Date | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description: "Quem aprovou/recusou: nome completo (nome de guerra).",
+  })
+  reviewedByName!: string | null;
+
+  @Field(() => Date, { nullable: true })
+  cancelledAt!: Date | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Quem cancelou: nome completo (nome de guerra).",
+  })
+  cancelledByName!: string | null;
+
+  @Field({
+    description: "Lançada por um gestor para o integrante (já aprovada).",
+  })
+  registered!: boolean;
+
   @Field()
   createdAt!: Date;
+
+  @Field(() => [AbsenceAttachmentType])
+  attachments!: AbsenceAttachmentType[];
+}
+
+@InputType()
+export class AttachedFileInput {
+  @Field({
+    description: "Chave devolvida por requestAbsenceAttachmentUploads.",
+  })
+  @IsString()
+  @MaxLength(300)
+  storageKey!: string;
+
+  @Field()
+  @IsString()
+  @MaxLength(200)
+  fileName!: string;
+}
+
+@InputType()
+export class AttachmentFileInput {
+  @Field()
+  @IsString()
+  @MaxLength(200)
+  fileName!: string;
+
+  @Field()
+  @IsString()
+  @MaxLength(60)
+  mimeType!: string;
+
+  @Field(() => Int)
+  @IsInt()
+  @Min(1)
+  sizeBytes!: number;
+}
+
+@ObjectType("AbsenceAttachmentUpload", {
+  description: "Para onde enviar um anexo (formulário assinado).",
+})
+export class AbsenceAttachmentUploadType {
+  @Field()
+  storageKey!: string;
+
+  @Field(() => UploadFormType)
+  upload!: UploadFormType;
 }
 
 @InputType()
@@ -87,6 +177,17 @@ export class AbsenceInput {
   @IsString()
   @MaxLength(500)
   reason?: string | null;
+
+  @Field(() => [AttachedFileInput], {
+    nullable: true,
+    description: `Imagens ou PDF já enviados (até ${MAX_ATTACHMENTS}).`,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_ATTACHMENTS)
+  @ValidateNested({ each: true })
+  @Type(() => AttachedFileInput)
+  attachments?: AttachedFileInput[];
 }
 
 @InputType()

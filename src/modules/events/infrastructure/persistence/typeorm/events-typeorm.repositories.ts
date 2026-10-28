@@ -12,6 +12,8 @@ import type {
 } from "@/modules/events/application/ports/events.ports";
 import {
   EventStatus,
+  EventType,
+  EventUniform,
   type BandEvent,
   type SetlistItem,
   type Venue,
@@ -31,6 +33,13 @@ import {
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
+const UNIFORMS = new Set<string>(Object.values(EventUniform));
+
+// Free text saved before the uniform list (until its migration runs) reads
+// as "no uniform" instead of breaking the GraphQL enum.
+const toUniform = (value: string | null): EventUniform | null =>
+  value && UNIFORMS.has(value) ? (value as EventUniform) : null;
+
 const toEvent = (row: EventOrmEntity): BandEvent => ({
   id: row.id,
   title: row.title,
@@ -40,7 +49,7 @@ const toEvent = (row: EventOrmEntity): BandEvent => ({
   startsAt: row.startsAt,
   endsAt: row.endsAt,
   venueId: row.venueId,
-  uniform: row.uniform,
+  uniform: toUniform(row.uniform),
   requester: row.requester,
   documentRef: row.documentRef,
   notes: row.notes,
@@ -89,6 +98,9 @@ export class EventTypeormRepository implements EventRepositoryPort {
       query.andWhere("event.status IN (:...statuses)", filter);
     }
     if (filter.type) query.andWhere("event.type = :type", filter);
+    if (filter.excludeType) {
+      query.andWhere("event.type <> :excludeType", filter);
+    }
     return (await query.getMany()).map(toEvent);
   }
 
@@ -122,8 +134,12 @@ export class EventTypeormRepository implements EventRepositoryPort {
         statuses: filter.statuses,
       });
     }
-    if (filter.type)
+    // Working days (expedientes) only show when that type is asked for.
+    if (filter.type) {
       query.andWhere("event.type = :type", { type: filter.type });
+    } else {
+      query.andWhere("event.type <> :duty", { duty: EventType.EXPEDIENTE });
+    }
     const [rows, total] = await query.getManyAndCount();
     return paginate(rows.map(toEvent), total, page);
   }
@@ -154,24 +170,55 @@ export class EventTypeormRepository implements EventRepositoryPort {
     return rows.map(toEvent);
   }
 
-  async create(data: EventData, createdBy: string): Promise<BandEvent> {
-    const saved = await this.repository.save(
-      this.repository.create({
-        ...data,
-        status: EventStatus.PLANEJADO,
-        createdBy,
-      }),
+  async createMany(
+    data: readonly EventData[],
+    createdBy: string,
+    status: EventStatus,
+  ): Promise<BandEvent[]> {
+    if (data.length === 0) return [];
+    const result = await this.repository.insert(
+      data.map((item) => ({ ...item, status, createdBy })),
     );
-    return toEvent(saved);
+    const ids = result.identifiers.map((row) => row.id as string);
+    const created = await this.findByIds(ids);
+    return created.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  }
+
+  async create(
+    data: EventData,
+    createdBy: string,
+    setlist: readonly SetlistItem[] = [],
+  ): Promise<BandEvent> {
+    const id = await this.dataSource.transaction(async (manager) => {
+      const result = await manager
+        .getRepository(EventOrmEntity)
+        .insert({ ...data, status: EventStatus.PLANEJADO, createdBy });
+      const eventId = result.identifiers[0]!.id as string;
+      if (setlist.length > 0) {
+        await manager
+          .getRepository(EventSongOrmEntity)
+          .insert(setlist.map((item) => ({ ...item, eventId })));
+      }
+      return eventId;
+    });
+    return toEvent(await this.repository.findOneOrFail({ where: { id } }));
   }
 
   async update(
     id: string,
     data: Partial<EventData>,
     messages: readonly OutboxDraft[],
+    setlist?: readonly SetlistItem[],
   ): Promise<BandEvent> {
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(EventOrmEntity).update({ id }, defined(data));
+      if (setlist) {
+        const songs = manager.getRepository(EventSongOrmEntity);
+        await songs.delete({ eventId: id });
+        if (setlist.length > 0) {
+          await songs.insert(setlist.map((item) => ({ ...item, eventId: id })));
+        }
+      }
       await this.outbox.write(manager, messages);
     });
     return toEvent(await this.repository.findOneOrFail({ where: { id } }));

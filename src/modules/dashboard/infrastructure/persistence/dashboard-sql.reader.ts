@@ -22,6 +22,7 @@ export class DashboardSqlReader implements DashboardReaderPort {
            FROM tb_events e
            LEFT JOIN tb_rosters r ON r.idtb_events = e.idtb_events
           WHERE e.status IN ('PLANEJADO', 'CONFIRMADO')
+            AND e.type <> 'EXPEDIENTE'
             AND e.starts_at >= $1 AND e.starts_at < $2
        ),
        lines AS (

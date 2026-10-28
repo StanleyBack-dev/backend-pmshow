@@ -144,13 +144,10 @@ export class VenuesUseCase {
     action: string,
     venue: Venue,
   ): Promise<void> {
-    return this.audit.record({
+    return this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action,
       entity: "venue",
       entityId: venue.id,
-      after: { name: venue.name, archived: venue.archived },
     });
   }
 }

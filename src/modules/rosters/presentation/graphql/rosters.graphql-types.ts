@@ -10,7 +10,6 @@ import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
   IsArray,
-  IsEnum,
   IsOptional,
   IsString,
   IsUUID,
@@ -19,12 +18,11 @@ import {
 } from "class-validator";
 import { AbsenceType } from "@/modules/availability/domain/absence";
 import { MemberStatus, Rank, Section } from "@/modules/members/domain/member";
-import { MemberInstrumentType } from "@/modules/members/presentation/graphql/members.graphql-types";
 import {
-  AckStatus,
-  AssignmentRole,
-  RosterStatus,
-} from "@/modules/rosters/domain/roster";
+  MemberFunctionType,
+  MemberInstrumentType,
+} from "@/modules/members/presentation/graphql/members.graphql-types";
+import { AckStatus, RosterStatus } from "@/modules/rosters/domain/roster";
 
 registerEnumType(RosterStatus, { name: "RosterStatus" });
 
@@ -38,10 +36,6 @@ export class RosterSummaryType {
   @Field(() => Int, { description: "Pessoas escaladas." })
   assignments!: number;
 }
-registerEnumType(AssignmentRole, {
-  name: "AssignmentRole",
-  description: "Função na escala.",
-});
 registerEnumType(AckStatus, {
   name: "AckStatus",
   description: "Resposta do escalado.",
@@ -69,8 +63,11 @@ export class AssignmentType {
   @Field(() => ID)
   userId!: string;
 
-  @Field(() => AssignmentRole)
-  role!: AssignmentRole;
+  @Field(() => ID, {
+    nullable: true,
+    description: "Função na banda (regente, motorista…); vazio = músico.",
+  })
+  functionId!: string | null;
 
   @Field(() => ID, { nullable: true })
   instrumentId!: string | null;
@@ -162,6 +159,15 @@ export class RosterCandidateType {
   @Field(() => Rank)
   rank!: Rank;
 
+  @Field(() => String, { nullable: true, description: "Matrícula." })
+  registration!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Só dígitos (DDD + número).",
+  })
+  phone!: string | null;
+
   @Field(() => Section)
   section!: Section;
 
@@ -170,6 +176,9 @@ export class RosterCandidateType {
 
   @Field(() => [MemberInstrumentType])
   instruments!: MemberInstrumentType[];
+
+  @Field(() => [MemberFunctionType])
+  functions!: MemberFunctionType[];
 
   @Field(() => CandidateBlocker, { nullable: true })
   blocker!: CandidateBlocker | null;
@@ -189,9 +198,13 @@ export class AssignmentInput {
   @IsUUID()
   userId!: string;
 
-  @Field(() => AssignmentRole)
-  @IsEnum(AssignmentRole)
-  role!: AssignmentRole;
+  @Field(() => ID, {
+    nullable: true,
+    description: "Função na banda; vazio = músico.",
+  })
+  @IsOptional()
+  @IsUUID()
+  functionId?: string | null;
 
   @Field(() => ID, { nullable: true })
   @IsOptional()

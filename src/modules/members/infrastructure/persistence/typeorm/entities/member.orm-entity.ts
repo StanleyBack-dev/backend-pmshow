@@ -70,3 +70,12 @@ export class MemberInstrumentOrmEntity {
   @Column({ name: "is_primary", type: "boolean", default: false })
   primary!: boolean;
 }
+
+@Entity("tb_member_functions")
+export class MemberFunctionOrmEntity {
+  @PrimaryColumn({ name: "idtb_users", type: "uuid" })
+  userId!: string;
+
+  @PrimaryColumn({ name: "idtb_band_functions", type: "uuid" })
+  functionId!: string;
+}

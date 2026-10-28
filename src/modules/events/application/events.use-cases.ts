@@ -19,9 +19,10 @@ import {
   EventStatus,
   normalizeSetlist,
   type BandEvent,
-  type EventType,
+  EventType,
   type SetlistItem,
   type StatusDenial,
+  EventUniform,
 } from "@/modules/events/domain/event";
 import { OutboxDispatcher } from "@/modules/outbox/application/outbox-dispatcher.service";
 import { SongsUseCase } from "@/modules/repertoire/application/songs.use-cases";
@@ -33,11 +34,13 @@ export type EventInput = {
   callTime?: Date | null;
   startsAt: Date;
   endsAt?: Date | null;
-  venueId?: string | null;
-  uniform?: string | null;
+  venueId: string;
+  uniform: EventUniform;
   requester?: string | null;
   documentRef?: string | null;
   notes?: string | null;
+  /** The list of songs, saved with the event; undefined = keep it. */
+  setlist?: { songId: string; notes?: string | null }[];
 };
 
 const MAX_EVENTS_PER_QUERY = 500;
@@ -63,16 +66,6 @@ const rescheduled = (before: BandEvent, after: BandEvent) =>
   !sameInstant(before.startsAt, after.startsAt) ||
   !sameInstant(before.endsAt, after.endsAt) ||
   before.venueId !== after.venueId;
-
-const snapshot = (event: BandEvent) => ({
-  title: event.title,
-  type: event.type,
-  status: event.status,
-  callTime: event.callTime?.toISOString() ?? null,
-  startsAt: event.startsAt.toISOString(),
-  endsAt: event.endsAt?.toISOString() ?? null,
-  venueId: event.venueId,
-});
 
 import type { PageRequest, Paginated } from "@/shared/application/pagination";
 
@@ -103,12 +96,16 @@ export class EventsUseCase {
     return this.events.list(filter, MAX_EVENTS_PER_QUERY);
   }
 
-  /** Next events not cancelled nor done, starting from now. */
+  /**
+   * Next events not cancelled nor done, starting from now. Working days
+   * (expediente) are left out: they have their own list.
+   */
   upcoming(limit: number): Promise<BandEvent[]> {
     return this.events.list(
       {
         from: this.clock.now(),
         statuses: [EventStatus.PLANEJADO, EventStatus.CONFIRMADO],
+        excludeType: EventType.EXPEDIENTE,
       },
       Math.min(Math.max(limit, 1), 20),
     );
@@ -135,15 +132,40 @@ export class EventsUseCase {
     input: EventInput,
   ): Promise<BandEvent> {
     const data = await this.toData(input);
-    const event = await this.events.create(data, actor.id);
-    await this.record(
-      actor,
-      "event.created",
-      event.id,
-      undefined,
-      snapshot(event),
-    );
+    const setlist = input.setlist
+      ? await this.validSetlist(input.setlist)
+      : undefined;
+    const event = await this.events.create(data, actor.id, setlist);
+    await this.stamp(actor, event.id, true);
     return event;
+  }
+
+  /**
+   * Many events at once, already in `status` (the working days of an
+   * expediente): one insert and one stamp, however many days.
+   */
+  async createMany(
+    actor: AuthenticatedUser,
+    inputs: readonly EventInput[],
+    status: EventStatus,
+  ): Promise<BandEvent[]> {
+    const venueIds = [...new Set(inputs.map((input) => input.venueId))];
+    const venues = await this.venues.findByIds(venueIds);
+    if (
+      venues.length !== venueIds.length ||
+      venues.some((venue) => venue.archived)
+    ) {
+      throw AppException.from(APP_ERRORS.events.venueNotFound, undefined);
+    }
+    const data = inputs.map((input) => this.dataOf(input));
+    const events = await this.events.createMany(data, actor.id, status);
+    await this.audit.stampMany({
+      actorId: actor.id,
+      entity: "event",
+      entityIds: events.map((event) => event.id),
+      created: true,
+    });
+    return events;
   }
 
   async update(
@@ -153,22 +175,26 @@ export class EventsUseCase {
   ): Promise<BandEvent> {
     const before = await this.editable(id);
     const data = await this.toData(input);
+    const setlist = input.setlist
+      ? await this.validSetlist(input.setlist)
+      : undefined;
     const changed = rescheduled(before, { ...before, ...data });
     const event = await this.events.update(
       id,
       data,
       changed
-        ? [eventChangedDraft({ eventId: id, change: "RESCHEDULED" })]
+        ? [
+            eventChangedDraft({
+              eventId: id,
+              change: "RESCHEDULED",
+              actorId: actor.id,
+            }),
+          ]
         : [],
+      setlist,
     );
     if (changed) this.outbox.kick();
-    await this.record(
-      actor,
-      "event.updated",
-      id,
-      snapshot(before),
-      snapshot(event),
-    );
+    await this.stamp(actor, id);
     return event;
   }
 
@@ -177,6 +203,8 @@ export class EventsUseCase {
     id: string,
     status: EventStatus,
     reason: string | null,
+    /** false: the caller tells the people itself (e.g. a whole batch). */
+    notify = true,
   ): Promise<BandEvent> {
     const before = await this.get(id);
     const denial = checkStatusChange(before.status, status, {
@@ -190,22 +218,23 @@ export class EventsUseCase {
       });
     }
     const cancelled = status === EventStatus.CANCELADO;
+    const announce = cancelled && notify;
     const event = await this.events.setStatus(
       id,
       status,
       cancelled ? text(reason) : null,
-      cancelled
-        ? [eventChangedDraft({ eventId: id, change: "CANCELLED" })]
+      announce
+        ? [
+            eventChangedDraft({
+              eventId: id,
+              change: "CANCELLED",
+              actorId: actor.id,
+            }),
+          ]
         : [],
     );
-    if (cancelled) this.outbox.kick();
-    await this.record(
-      actor,
-      "event.status_changed",
-      id,
-      { status: before.status },
-      { status: event.status, reason: event.cancellationReason },
-    );
+    if (announce) this.outbox.kick();
+    await this.stamp(actor, id);
     return event;
   }
 
@@ -215,10 +244,22 @@ export class EventsUseCase {
     items: { songId: string; notes?: string | null }[],
   ): Promise<SetlistItem[]> {
     await this.editable(id);
-    const setlist = normalizeSetlist(items);
+    const setlist = await this.validSetlist(items);
+    await this.events.replaceSetlist(id, setlist);
+    await this.stamp(actor, id);
+    return setlist;
+  }
+
+  // Done is final; cancelled is locked until reopened (back to planned).
+  /** In order, without repeats, only songs still in the repertoire. */
+  private async validSetlist(
+    items: readonly { songId: string; notes?: string | null }[],
+  ): Promise<SetlistItem[]> {
+    const setlist = normalizeSetlist([...items]);
     if (setlist.length > MAX_SETLIST) {
       throw AppException.from(APP_ERRORS.events.setlistTooLong, undefined);
     }
+    if (setlist.length === 0) return setlist;
     const found = await this.songs.findMany(setlist.map((item) => item.songId));
     const usable = new Set(
       found.filter((song) => !song.archivedAt).map((song) => song.id),
@@ -226,11 +267,6 @@ export class EventsUseCase {
     if (setlist.some((item) => !usable.has(item.songId))) {
       throw AppException.from(APP_ERRORS.events.setlistUnknownSong, undefined);
     }
-
-    await this.events.replaceSetlist(id, setlist);
-    await this.record(actor, "event.setlist_updated", id, undefined, {
-      songs: setlist.length,
-    });
     return setlist;
   }
 
@@ -239,10 +275,23 @@ export class EventsUseCase {
     if (event.status === EventStatus.REALIZADO) {
       throw AppException.from(APP_ERRORS.events.eventDone, undefined);
     }
+    if (event.status === EventStatus.CANCELADO) {
+      throw AppException.from(APP_ERRORS.events.eventCancelled, undefined);
+    }
     return event;
   }
 
   private async toData(input: EventInput): Promise<EventData> {
+    const data = this.dataOf(input);
+    const venue = await this.venues.findById(input.venueId);
+    if (!venue || venue.archived) {
+      throw AppException.from(APP_ERRORS.events.venueNotFound, undefined);
+    }
+    return data;
+  }
+
+  /** Checks the schedule and normalizes the texts (no venue lookup). */
+  private dataOf(input: EventInput): EventData {
     const schedule = {
       callTime: input.callTime ?? null,
       startsAt: input.startsAt,
@@ -251,39 +300,28 @@ export class EventsUseCase {
     if (checkSchedule(schedule).length > 0) {
       throw AppException.from(APP_ERRORS.events.invalidSchedule, undefined);
     }
-    if (input.venueId) {
-      const venue = await this.venues.findById(input.venueId);
-      if (!venue || venue.archived) {
-        throw AppException.from(APP_ERRORS.events.venueNotFound, undefined);
-      }
-    }
     return {
       title: input.title.trim().replace(/\s+/g, " "),
       type: input.type,
       ...schedule,
-      venueId: input.venueId ?? null,
-      uniform: text(input.uniform),
+      venueId: input.venueId,
+      uniform: input.uniform,
       requester: text(input.requester),
       documentRef: text(input.documentRef),
       notes: text(input.notes),
     };
   }
 
-  private record(
+  private stamp(
     actor: AuthenticatedUser,
-    action: string,
     id: string,
-    before: Record<string, unknown> | undefined,
-    after: Record<string, unknown>,
+    created = false,
   ): Promise<void> {
-    return this.audit.record({
+    return this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action,
       entity: "event",
       entityId: id,
-      before,
-      after,
+      created,
     });
   }
 }

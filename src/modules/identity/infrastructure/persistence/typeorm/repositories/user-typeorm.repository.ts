@@ -30,6 +30,7 @@ const toUser = (row: UserOrmEntity): User => ({
   updatedAt: row.updatedAt,
   deactivatedAt: row.deactivatedAt,
   lastLoginAt: row.lastLoginAt,
+  avatarKey: row.avatarKey,
 });
 
 type AccountRaw = {
@@ -87,9 +88,9 @@ export class UserTypeormRepository implements UserRepositoryPort {
     return this.repository.count({ where: { group, active: true } });
   }
 
-  async listActiveIds(): Promise<string[]> {
+  async listActiveIds(group?: UserGroup): Promise<string[]> {
     const rows = await this.repository.find({
-      where: { active: true },
+      where: { active: true, group },
       select: { id: true },
     });
     return rows.map((row) => row.id);

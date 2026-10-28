@@ -10,10 +10,13 @@ import { InstrumentsUseCase } from "@/modules/members/application/use-cases/inst
 import { MembersUseCase } from "@/modules/members/application/use-cases/members.use-cases";
 import type {
   Instrument,
+  InstrumentListItem,
   MemberProfile,
 } from "@/modules/members/domain/member";
 import {
   CreateInstrumentInput,
+  InstrumentFilterInput,
+  InstrumentPage,
   InstrumentType,
   MemberProfileInput,
   MemberProfileType,
@@ -79,6 +82,25 @@ export class MembersResolver {
     @Args("includeArchived", { defaultValue: false }) includeArchived: boolean,
   ): Promise<Instrument[]> {
     return this.instrumentsUseCase.list(includeArchived);
+  }
+
+  @RequirePermissions(Permission.MEMBERS_MANAGE)
+  @Query(() => InstrumentPage, {
+    description:
+      "Página do catálogo de instrumentos: busca, naipe, arquivados.",
+  })
+  instrumentsPage(
+    @Args("filter", { nullable: true }) filter?: InstrumentFilterInput,
+    @Args("page", { nullable: true }) page?: PageInput,
+  ): Promise<Paginated<InstrumentListItem>> {
+    return this.instrumentsUseCase.page(
+      {
+        search: filter?.search,
+        section: filter?.section,
+        archived: filter?.archived ?? false,
+      },
+      page ?? { page: 1, limit: 10 },
+    );
   }
 
   @RequirePermissions(Permission.MEMBERS_MANAGE)

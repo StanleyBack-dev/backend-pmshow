@@ -5,11 +5,7 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
-import {
-  AckStatus,
-  AssignmentRole,
-  RosterStatus,
-} from "@/modules/rosters/domain/roster";
+import { AckStatus, RosterStatus } from "@/modules/rosters/domain/roster";
 
 // One roster per event: the event id is the key (FK in the migration).
 @Entity("tb_rosters")
@@ -44,8 +40,8 @@ export class RosterAssignmentOrmEntity {
   @PrimaryColumn({ name: "idtb_users", type: "uuid" })
   userId!: string;
 
-  @Column({ type: "varchar", length: 16 })
-  role!: AssignmentRole;
+  @Column({ name: "idtb_band_functions", type: "uuid", nullable: true })
+  functionId!: string | null;
 
   @Column({ name: "idtb_instruments", type: "uuid", nullable: true })
   instrumentId!: string | null;

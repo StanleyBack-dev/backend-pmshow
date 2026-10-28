@@ -1,7 +1,6 @@
 import { MemberStatus } from "@/modules/members/domain/member";
 import {
   AckStatus,
-  AssignmentRole,
   blockerOf,
   checkAssignments,
   diffAssignments,
@@ -16,6 +15,8 @@ import {
   type CandidateFacts,
 } from "@/modules/rosters/domain/roster";
 
+const FUNCTIONS = new Set(["regente", "som", "chefe", "motorista"]);
+
 const at = (time: string) => new Date(`2026-11-15T${time}:00-03:00`);
 
 const facts = (overrides: Partial<CandidateFacts> = {}): CandidateFacts => ({
@@ -28,7 +29,7 @@ const facts = (overrides: Partial<CandidateFacts> = {}): CandidateFacts => ({
 
 const line = (userId: string, extra: Partial<Assignment> = {}): Assignment => ({
   userId,
-  role: AssignmentRole.MUSICO,
+  functionId: null,
   instrumentId: null,
   notes: null,
   overrideReason: null,
@@ -70,21 +71,21 @@ describe("normalizeAssignments", () => {
   it("keeps the first line per person and trims texts", () => {
     expect(
       normalizeAssignments([
-        { userId: "a", role: AssignmentRole.REGENTE, notes: "  frente  " },
-        { userId: "a", role: AssignmentRole.MUSICO },
-        { userId: "b", role: AssignmentRole.SOM, overrideReason: "   " },
+        { userId: "a", functionId: "regente", notes: "  frente  " },
+        { userId: "a" },
+        { userId: "b", functionId: "som", overrideReason: "   " },
       ]),
     ).toEqual([
       {
         userId: "a",
-        role: AssignmentRole.REGENTE,
+        functionId: "regente",
         instrumentId: null,
         notes: "frente",
         overrideReason: null,
       },
       {
         userId: "b",
-        role: AssignmentRole.SOM,
+        functionId: "som",
         instrumentId: null,
         notes: null,
         overrideReason: null,
@@ -104,36 +105,39 @@ describe("blockerOf / checkAssignments", () => {
   });
 
   it("accepts an active, available member", () => {
-    const lines = normalizeAssignments([
-      { userId: "a", role: AssignmentRole.MUSICO, instrumentId: "sax" },
-    ]);
-    expect(checkAssignments(lines, new Map([["a", facts()]]))).toEqual([]);
+    const lines = normalizeAssignments([{ userId: "a", instrumentId: "sax" }]);
+    expect(
+      checkAssignments(lines, new Map([["a", facts()]]), FUNCTIONS),
+    ).toEqual([]);
   });
 
   it("treats someone unknown as without profile", () => {
-    const lines = normalizeAssignments([
-      { userId: "ghost", role: AssignmentRole.MUSICO },
-    ]);
-    expect(checkAssignments(lines, new Map())).toEqual([
+    const lines = normalizeAssignments([{ userId: "ghost" }]);
+    expect(checkAssignments(lines, new Map(), FUNCTIONS)).toEqual([
       { userId: "ghost", kind: "blocked", blocker: "no-profile" },
     ]);
   });
 
+  it("refuses a function that does not exist", () => {
+    const lines = normalizeAssignments([{ userId: "a", functionId: "ghost" }]);
+    expect(
+      checkAssignments(lines, new Map([["a", facts()]]), FUNCTIONS),
+    ).toEqual([{ userId: "a", kind: "unknown-function" }]);
+  });
+
   it("refuses an instrument the member does not play", () => {
-    const lines = normalizeAssignments([
-      { userId: "a", role: AssignmentRole.MUSICO, instrumentId: "tuba" },
-    ]);
-    expect(checkAssignments(lines, new Map([["a", facts()]]))).toEqual([
-      { userId: "a", kind: "unknown-instrument" },
-    ]);
+    const lines = normalizeAssignments([{ userId: "a", instrumentId: "tuba" }]);
+    expect(
+      checkAssignments(lines, new Map([["a", facts()]]), FUNCTIONS),
+    ).toEqual([{ userId: "a", kind: "unknown-instrument" }]);
   });
 
   it("asks for a reason when busy elsewhere, and accepts it with one", () => {
     const busy = facts({ busyWith: [{ eventId: "e2", title: "Desfile" }] });
-    const without = normalizeAssignments([
-      { userId: "a", role: AssignmentRole.MUSICO },
-    ]);
-    expect(checkAssignments(without, new Map([["a", busy]]))).toEqual([
+    const without = normalizeAssignments([{ userId: "a" }]);
+    expect(
+      checkAssignments(without, new Map([["a", busy]]), FUNCTIONS),
+    ).toEqual([
       {
         userId: "a",
         kind: "busy-needs-reason",
@@ -143,17 +147,16 @@ describe("blockerOf / checkAssignments", () => {
     const withReason = normalizeAssignments([
       {
         userId: "a",
-        role: AssignmentRole.MUSICO,
         overrideReason: "Sai do desfile antes",
       },
     ]);
-    expect(checkAssignments(withReason, new Map([["a", busy]]))).toEqual([]);
+    expect(
+      checkAssignments(withReason, new Map([["a", busy]]), FUNCTIONS),
+    ).toEqual([]);
   });
 
   it("a blocker wins over a schedule conflict", () => {
-    const lines = normalizeAssignments([
-      { userId: "a", role: AssignmentRole.MUSICO },
-    ]);
+    const lines = normalizeAssignments([{ userId: "a" }]);
     const map = new Map([
       [
         "a",
@@ -163,7 +166,7 @@ describe("blockerOf / checkAssignments", () => {
         }),
       ],
     ]);
-    expect(checkAssignments(lines, map)).toEqual([
+    expect(checkAssignments(lines, map, FUNCTIONS)).toEqual([
       { userId: "a", kind: "blocked", blocker: "absent" },
     ]);
   });
@@ -176,12 +179,12 @@ describe("diffAssignments / mergeAcks", () => {
     line("c", { ackStatus: AckStatus.TROCA_SOLICITADA, ackNote: "Plantão" }),
   ];
   const after = normalizeAssignments([
-    { userId: "a", role: AssignmentRole.MUSICO },
-    { userId: "b", role: AssignmentRole.CHEFE_EQUIPE },
-    { userId: "d", role: AssignmentRole.MOTORISTA },
+    { userId: "a" },
+    { userId: "b", functionId: "chefe" },
+    { userId: "d", functionId: "motorista" },
   ]);
 
-  it("lists who entered, left and changed role", () => {
+  it("lists who entered, left and changed function", () => {
     expect(diffAssignments(before, after)).toEqual({
       added: ["d"],
       removed: ["c"],

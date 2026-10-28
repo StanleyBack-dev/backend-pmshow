@@ -1,21 +1,12 @@
 import { MemberStatus } from "@/modules/members/domain/member";
 
-// A roster (escala) says who goes to an event and in which role. One per
-// event. Drafts are only seen by managers; publishing notifies everyone on
+// A roster (escala) says who goes to an event and in which function (none =
+// musician) and instrument. One per event. Drafts are only seen by managers; publishing notifies everyone on
 // it, and later edits notify only the people they affect.
 
 export enum RosterStatus {
   RASCUNHO = "RASCUNHO",
   PUBLICADA = "PUBLICADA",
-}
-
-export enum AssignmentRole {
-  MUSICO = "MUSICO",
-  REGENTE = "REGENTE",
-  CHEFE_EQUIPE = "CHEFE_EQUIPE",
-  MOTORISTA = "MOTORISTA",
-  SOM = "SOM",
-  APOIO = "APOIO",
 }
 
 /** The member's answer to a published roster. */
@@ -27,7 +18,8 @@ export enum AckStatus {
 
 export type Assignment = {
   userId: string;
-  role: AssignmentRole;
+  /** Function in the band catalog (regente, motorista…); null = musician. */
+  functionId: string | null;
   instrumentId: string | null;
   notes: string | null;
   /** Why the manager kept someone busy in another event at the same time. */
@@ -49,7 +41,7 @@ export type Roster = {
 
 export type AssignmentInput = {
   userId: string;
-  role: AssignmentRole;
+  functionId?: string | null;
   instrumentId?: string | null;
   notes?: string | null;
   overrideReason?: string | null;
@@ -91,7 +83,7 @@ export function normalizeAssignments(
     seen.add(item.userId);
     result.push({
       userId: item.userId,
-      role: item.role,
+      functionId: item.functionId ?? null,
       instrumentId: item.instrumentId ?? null,
       notes: text(item.notes),
       overrideReason: text(item.overrideReason),
@@ -124,6 +116,7 @@ export function blockerOf(facts: CandidateFacts): Blocker | null {
 export type AssignmentProblem =
   | { userId: string; kind: "blocked"; blocker: Blocker }
   | { userId: string; kind: "unknown-instrument" }
+  | { userId: string; kind: "unknown-function" }
   | {
       userId: string;
       kind: "busy-needs-reason";
@@ -137,6 +130,8 @@ export type AssignmentProblem =
 export function checkAssignments(
   assignments: readonly Required<AssignmentInput>[],
   facts: ReadonlyMap<string, CandidateFacts>,
+  /** Functions that exist (archived ones included: old lines keep them). */
+  functionIds: ReadonlySet<string>,
 ): AssignmentProblem[] {
   const problems: AssignmentProblem[] = [];
   for (const item of assignments) {
@@ -155,6 +150,10 @@ export function checkAssignments(
       problems.push({ userId: item.userId, kind: "unknown-instrument" });
       continue;
     }
+    if (item.functionId && !functionIds.has(item.functionId)) {
+      problems.push({ userId: item.userId, kind: "unknown-function" });
+      continue;
+    }
     if (known.busyWith.length > 0 && !item.overrideReason) {
       problems.push({
         userId: item.userId,
@@ -169,13 +168,13 @@ export function checkAssignments(
 export type RosterDiff = {
   added: string[];
   removed: string[];
-  /** Role or instrument changed. */
+  /** Function or instrument changed. */
   changed: string[];
 };
 
 export function diffAssignments(
-  before: readonly Pick<Assignment, "userId" | "role" | "instrumentId">[],
-  after: readonly Pick<Assignment, "userId" | "role" | "instrumentId">[],
+  before: readonly Pick<Assignment, "userId" | "functionId" | "instrumentId">[],
+  after: readonly Pick<Assignment, "userId" | "functionId" | "instrumentId">[],
 ): RosterDiff {
   const old = new Map(before.map((item) => [item.userId, item]));
   const next = new Map(after.map((item) => [item.userId, item]));
@@ -189,7 +188,7 @@ export function diffAssignments(
         const previous = old.get(item.userId);
         return (
           previous !== undefined &&
-          (previous.role !== item.role ||
+          (previous.functionId !== item.functionId ||
             previous.instrumentId !== item.instrumentId)
         );
       })
@@ -213,7 +212,7 @@ export function mergeAcks(
     const previous = old.get(item.userId);
     const unchanged =
       previous !== undefined &&
-      previous.role === item.role &&
+      previous.functionId === item.functionId &&
       previous.instrumentId === item.instrumentId;
     return {
       ...item,

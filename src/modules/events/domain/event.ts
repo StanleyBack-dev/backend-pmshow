@@ -4,11 +4,36 @@ export enum EventType {
   SHOW = "SHOW",
   DESFILE = "DESFILE",
   SOLENIDADE = "SOLENIDADE",
+  BAILE = "BAILE",
   FORMATURA = "FORMATURA",
   ENSAIO = "ENSAIO",
   CULTO_MISSA = "CULTO_MISSA",
+  /** A working day (expediente), created in batches from "Escalas". */
+  EXPEDIENTE = "EXPEDIENTE",
   OUTRO = "OUTRO",
 }
+
+/**
+ * Uniforms of the PMGO (RUPMGO, Decreto 8.896/2017): the operational 4º
+ * A/B/C, túnica and social; paisano is plain clothes (no uniform).
+ */
+export enum EventUniform {
+  OPERACIONAL_4A = "OPERACIONAL_4A",
+  OPERACIONAL_4B = "OPERACIONAL_4B",
+  OPERACIONAL_4C = "OPERACIONAL_4C",
+  TUNICA = "TUNICA",
+  SOCIAL = "SOCIAL",
+  PAISANO = "PAISANO",
+}
+
+export const UNIFORM_LABELS: Record<EventUniform, string> = {
+  [EventUniform.OPERACIONAL_4A]: "4º A – operacional (gandola)",
+  [EventUniform.OPERACIONAL_4B]: "4º B – operacional",
+  [EventUniform.OPERACIONAL_4C]: "4º C – operacional",
+  [EventUniform.TUNICA]: "Túnica",
+  [EventUniform.SOCIAL]: "Social",
+  [EventUniform.PAISANO]: "Paisano (traje civil)",
+};
 
 export enum EventStatus {
   PLANEJADO = "PLANEJADO",
@@ -35,7 +60,8 @@ export type BandEvent = {
   startsAt: Date;
   endsAt: Date | null;
   venueId: string | null;
-  uniform: string | null;
+  /** Required on save; null only on events older than the list. */
+  uniform: EventUniform | null;
   requester: string | null;
   /** Official document that requested the band (ofício, memorando…). */
   documentRef: string | null;

@@ -40,5 +40,7 @@ import { RepertoireModule } from "@/modules/repertoire/repertoire.module";
     { provide: YOUTUBE_METADATA, useClass: YoutubeOEmbedAdapter },
     { provide: YOUTUBE_SEARCH, useClass: YoutubeDataApiAdapter },
   ],
+  // The bucket also keeps profile photos (enrollment).
+  exports: [OBJECT_STORAGE],
 })
 export class MediaModule {}

@@ -4,6 +4,7 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  PutObjectCommand,
   S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
@@ -68,6 +69,20 @@ export class NeonObjectStorageAdapter implements ObjectStoragePort {
       fields: result.fields,
       expiresAt: new Date(Date.now() + params.expiresInSeconds * 1000),
     };
+  }
+
+  async put(key: string, body: Buffer, contentType: string): Promise<void> {
+    const client = this.getClient();
+    await this.run("put", () =>
+      client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+        }),
+      ),
+    );
   }
 
   async head(

@@ -3,6 +3,7 @@ import type { AuthenticatedUser } from "@/common/auth/authenticated-user";
 import { APP_ERRORS } from "@/common/exceptions/app-errors.catalog";
 import { AppException } from "@/common/exceptions/app-exception";
 import { AuditTrailService } from "@/modules/audit/application/audit-trail.service";
+import { BandFunctionsUseCase } from "@/modules/band-functions/application/band-functions.use-cases";
 import { UserLookupService } from "@/modules/identity/application/user-lookup.service";
 import {
   INSTRUMENT_REPOSITORY,
@@ -36,18 +37,9 @@ export type MemberProfileInput = {
   status: MemberStatus;
   notes?: string | null;
   instruments: { instrumentId: string; primary: boolean }[];
+  /** undefined = keep the functions the profile already has. */
+  functionIds?: string[];
 };
-
-const snapshot = (profile: MemberProfile | null) =>
-  profile && {
-    warName: profile.warName,
-    rank: profile.rank,
-    registration: profile.registration,
-    phone: profile.phone,
-    section: profile.section,
-    status: profile.status,
-    instruments: profile.instruments.map((item) => item.name),
-  };
 
 @Injectable()
 export class MembersUseCase {
@@ -57,6 +49,7 @@ export class MembersUseCase {
     private readonly instruments: InstrumentRepositoryPort,
     private readonly users: UserLookupService,
     private readonly audit: AuditTrailService,
+    private readonly functions: BandFunctionsUseCase,
   ) {}
 
   roster(
@@ -79,6 +72,25 @@ export class MembersUseCase {
     return this.members.findProfile(userId);
   }
 
+  /**
+   * Who did something, as the e-mails show it: the full name plus the war
+   * name when there is a profile ("Fulano de Tal (Tal)"). Takes the user
+   * (saves a query) or just their id.
+   */
+  async signatureOf(
+    who: string | { id: string; name: string },
+  ): Promise<string | null> {
+    const id = typeof who === "string" ? who : who.id;
+    const [name, profile] = await Promise.all([
+      typeof who === "string"
+        ? this.users.findById(who).then((user) => user?.name ?? null)
+        : who.name,
+      this.members.findProfile(id),
+    ]);
+    if (!name) return null;
+    return profile?.warName ? `${name} (${profile.warName})` : name;
+  }
+
   async save(
     actor: AuthenticatedUser,
     userId: string,
@@ -87,18 +99,15 @@ export class MembersUseCase {
     if (!(await this.users.findById(userId))) {
       throw AppException.from(APP_ERRORS.members.userNotFound, undefined);
     }
-    const data = await this.validate(userId, input);
     const before = await this.members.findProfile(userId);
+    const data = await this.validate(userId, input, before);
     const saved = await this.members.saveProfile(userId, data);
 
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: before ? "member.updated" : "member.created",
       entity: "member",
       entityId: userId,
-      before: snapshot(before),
-      after: snapshot(saved),
+      created: !before,
     });
     return saved;
   }
@@ -106,6 +115,7 @@ export class MembersUseCase {
   private async validate(
     userId: string,
     input: MemberProfileInput,
+    before: MemberProfile | null,
   ): Promise<MemberProfileData> {
     let phone: string | null = null;
     if (input.phone?.trim()) {
@@ -150,6 +160,20 @@ export class MembersUseCase {
       throw AppException.from(APP_ERRORS.members.unknownInstrument, undefined);
     }
 
+    let functionIds: string[] | undefined;
+    if (input.functionIds) {
+      functionIds = [...new Set(input.functionIds)];
+      // An archived function stays on whoever already has it.
+      const kept = new Set(before?.functions.map((item) => item.functionId));
+      const known = await this.functions.findByIds(functionIds);
+      if (
+        known.length !== functionIds.length ||
+        known.some((item) => item.archived && !kept.has(item.id))
+      ) {
+        throw AppException.from(APP_ERRORS.members.unknownFunction, undefined);
+      }
+    }
+
     return {
       warName: normalizeWarName(input.warName),
       rank: input.rank,
@@ -159,6 +183,7 @@ export class MembersUseCase {
       status: input.status,
       notes: input.notes?.trim() || null,
       instruments,
+      functionIds,
     };
   }
 }

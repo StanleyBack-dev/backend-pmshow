@@ -4,19 +4,23 @@ import {
   Context,
   Field,
   ID,
+  Int,
   Mutation,
   ObjectType,
   Parent,
   Query,
   ResolveField,
   Resolver,
+  registerEnumType,
 } from "@nestjs/graphql";
 import type { AuthenticatedUser } from "@/common/auth/authenticated-user";
 import { CurrentUser } from "@/common/decorators/current-user.decorator";
+import { PageInput, Paginated } from "@/common/graphql/pagination.graphql";
 import { requestLoader } from "@/common/graphql/request-loader";
 import { PermissionsService } from "@/modules/access-control/application/permissions.service";
 import { Permission } from "@/modules/access-control/domain/permission";
 import { RequirePermissions } from "@/modules/access-control/presentation/decorators/require-permissions.decorator";
+import { BandFunctionsUseCase } from "@/modules/band-functions/application/band-functions.use-cases";
 import { EventsUseCase } from "@/modules/events/application/events.use-cases";
 import type { BandEvent } from "@/modules/events/domain/event";
 import { EventGqlType } from "@/modules/events/presentation/graphql/events.graphql-types";
@@ -32,6 +36,7 @@ import {
   type RosterView,
 } from "@/modules/rosters/application/rosters.use-cases";
 import { AckStatus, type Assignment } from "@/modules/rosters/domain/roster";
+import type { Paginated as PaginatedResult } from "@/shared/application/pagination";
 import {
   AckAnswer,
   AssignmentType,
@@ -55,9 +60,49 @@ class RosterPersonType {
   @Field(() => Rank)
   rank!: Rank;
 
+  @Field(() => String, { nullable: true, description: "Matrícula." })
+  registration!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Só dígitos (DDD + número).",
+  })
+  phone!: string | null;
+
   @Field(() => Section)
   section!: Section;
 }
+
+const MyAssignmentPage = Paginated(MyAssignmentType, "MyAssignmentPage");
+
+@ObjectType("MyAssignmentCounts")
+class MyAssignmentCountsType {
+  @Field(() => Int)
+  acknowledged!: number;
+
+  @Field(() => Int, { description: "Aguardando ciência ou com troca pedida." })
+  pending!: number;
+
+  @Field(() => Int, { description: "Dias de expediente." })
+  duty!: number;
+}
+
+export enum MyAssignmentTabEnum {
+  PENDING = "pending",
+  ACKNOWLEDGED = "acknowledged",
+  DUTY = "duty",
+}
+registerEnumType(MyAssignmentTabEnum, {
+  name: "MyAssignmentTab",
+  description: "Aba de Minhas escalas.",
+  valuesMap: {
+    PENDING: {
+      description: "Eventos aguardando ciência (ou com troca pedida).",
+    },
+    ACKNOWLEDGED: { description: "Eventos com ciência confirmada." },
+    DUTY: { description: "Dias de expediente (sem ciência)." },
+  },
+});
 
 // Instruments ride along (not exposed) to name the line's instrument.
 type RosterPerson = RosterPersonType & {
@@ -82,7 +127,7 @@ export class RostersResolver {
   @Query(() => RosterType, {
     nullable: true,
     description:
-      "Escala do evento. Rascunhos só para quem vê todas; publicada para quem está nela.",
+      "Escala do evento. Rascunhos só para quem vê todas; publicada para todos (sem contatos para quem não é gestor).",
   })
   async eventRoster(
     @CurrentUser() user: AuthenticatedUser,
@@ -112,8 +157,45 @@ export class RostersResolver {
   })
   myAssignments(
     @CurrentUser() user: AuthenticatedUser,
+    @Args("acknowledged", {
+      type: () => Boolean,
+      nullable: true,
+      description:
+        "true: só cientes; false: as que faltam ciência; vazio: todas.",
+    })
+    acknowledged?: boolean | null,
   ): Promise<EventAssignment[]> {
-    return this.rostersUseCase.myAssignments(user.id);
+    return this.rostersUseCase.myAssignments(
+      user.id,
+      acknowledged ?? undefined,
+    );
+  }
+
+  @RequirePermissions(Permission.ROSTERS_READ_OWN)
+  @Query(() => MyAssignmentPage, {
+    description: "Minhas escalas publicadas de uma aba, por página.",
+  })
+  myAssignmentsPage(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args("tab", { type: () => MyAssignmentTabEnum })
+    tab: MyAssignmentTabEnum,
+    @Args("page", { nullable: true }) page?: PageInput,
+  ): Promise<PaginatedResult<EventAssignment>> {
+    return this.rostersUseCase.myAssignmentsPage(
+      user.id,
+      tab,
+      page ?? { page: 1, limit: 10 },
+    );
+  }
+
+  @RequirePermissions(Permission.ROSTERS_READ_OWN)
+  @Query(() => MyAssignmentCountsType, {
+    description: "Quantas das minhas escalas há em cada aba.",
+  })
+  myAssignmentCounts(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<MyAssignmentCountsType> {
+    return this.rostersUseCase.myAssignmentCounts(user.id);
   }
 
   @RequirePermissions(Permission.ROSTERS_MANAGE)
@@ -127,6 +209,31 @@ export class RostersResolver {
     @Args("input") input: RosterInput,
   ): Promise<RosterView> {
     return this.rostersUseCase.save(actor, eventId, input.assignments);
+  }
+
+  @RequirePermissions(Permission.ROSTERS_MANAGE)
+  @Query(() => MyAssignmentPage, {
+    description:
+      "Pedidos de troca em aberto nas escalas publicadas dos próximos eventos.",
+  })
+  swapRequests(
+    @Args("page", { nullable: true }) page?: PageInput,
+  ): Promise<PaginatedResult<EventAssignment>> {
+    return this.rostersUseCase.swapRequests(page ?? { page: 1, limit: 10 });
+  }
+
+  @RequirePermissions(Permission.ROSTERS_MANAGE)
+  @Mutation(() => AssignmentType, {
+    description:
+      "Não aceita o pedido de troca: a pessoa continua na escala e volta a dar ciência (é avisada).",
+  })
+  keepOnRoster(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Args("eventId", { type: () => ID }, Id()) eventId: string,
+    @Args("userId", { type: () => ID }, Id()) userId: string,
+    @Args("note", { type: () => String, nullable: true }) note: string | null,
+  ): Promise<Assignment> {
+    return this.rostersUseCase.keepOnRoster(actor, eventId, userId, note);
   }
 
   @RequirePermissions(Permission.ROSTERS_PUBLISH)
@@ -162,17 +269,39 @@ export class RostersResolver {
 // Names for each line (one query per request for the whole roster).
 @Resolver(() => AssignmentType)
 export class AssignmentFieldsResolver {
-  constructor(private readonly membersUseCase: MembersUseCase) {}
+  constructor(
+    private readonly membersUseCase: MembersUseCase,
+    private readonly functionsUseCase: BandFunctionsUseCase,
+    private readonly permissions: PermissionsService,
+  ) {}
+
+  @ResolveField(() => String, {
+    nullable: true,
+    description: "Nome da função; vazio = músico.",
+  })
+  functionName(
+    @Parent() line: Assignment,
+    @Context() context: object,
+  ): Promise<string | null> {
+    return loadFunctionName(this.functionsUseCase, context, line.functionId);
+  }
 
   @ResolveField(() => RosterPersonType, {
     nullable: true,
     description: "null se a conta foi desativada.",
   })
-  person(
+  async person(
     @Parent() line: Assignment,
+    @CurrentUser() user: AuthenticatedUser,
     @Context() context: object,
   ): Promise<RosterPerson | null> {
-    return loadPerson(this.membersUseCase, context, line.userId);
+    const person = await loadPerson(this.membersUseCase, context, line.userId);
+    if (!person || line.userId === user.id) return person;
+    // Phone and registration of the others: only who sees every roster.
+    const granted = await this.permissions.effectiveFor(user);
+    return granted.has(Permission.ROSTERS_READ_ALL)
+      ? person
+      : { ...person, phone: null, registration: null };
   }
 
   @ResolveField(() => String, { nullable: true })
@@ -190,7 +319,19 @@ export class MyAssignmentFieldsResolver {
   constructor(
     private readonly eventsUseCase: EventsUseCase,
     private readonly membersUseCase: MembersUseCase,
+    private readonly functionsUseCase: BandFunctionsUseCase,
   ) {}
+
+  @ResolveField(() => String, {
+    nullable: true,
+    description: "Nome da função; vazio = músico.",
+  })
+  functionName(
+    @Parent() line: EventAssignment,
+    @Context() context: object,
+  ): Promise<string | null> {
+    return loadFunctionName(this.functionsUseCase, context, line.functionId);
+  }
 
   @ResolveField(() => EventGqlType, { nullable: true })
   event(
@@ -221,6 +362,20 @@ export class MyAssignmentFieldsResolver {
   }
 }
 
+// Every function by id, once per request (archived ones too).
+async function loadFunctionName(
+  functions: BandFunctionsUseCase,
+  context: object,
+  functionId: string | null,
+): Promise<string | null> {
+  if (!functionId) return null;
+  const name = await requestLoader(context, "band-functions", async () => {
+    const all = await functions.list(true);
+    return new Map(all.map((item) => [item.id, item.name]));
+  }).load(functionId);
+  return name ?? null;
+}
+
 function loadPerson(
   members: MembersUseCase,
   context: object,
@@ -235,6 +390,8 @@ function loadPerson(
           name: entry.name,
           warName: entry.profile!.warName,
           rank: entry.profile!.rank,
+          registration: entry.profile!.registration,
+          phone: entry.profile!.phone,
           section: entry.profile!.section,
           instruments: entry.profile!.instruments,
         },
@@ -267,5 +424,20 @@ export class EventRosterFieldResolver {
         ? this.rostersUseCase.summaries(ids)
         : new Map<string, RosterSummary>();
     }).load(event.id);
+  }
+
+  @ResolveField(() => AssignmentType, {
+    nullable: true,
+    description:
+      "Minha linha na escala publicada do evento (null: não estou nela).",
+  })
+  myAssignment(
+    @Parent() event: BandEvent,
+    @CurrentUser() user: AuthenticatedUser,
+    @Context() context: object,
+  ): Promise<Assignment | null> {
+    return requestLoader(context, "my-roster-lines", (ids) =>
+      this.rostersUseCase.myLinesOn(user.id, ids),
+    ).load(event.id);
   }
 }

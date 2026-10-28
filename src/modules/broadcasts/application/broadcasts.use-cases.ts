@@ -63,6 +63,7 @@ export class BroadcastsUseCase {
     if (userIds.length === 0) {
       throw AppException.from(APP_ERRORS.broadcasts.noRecipients, undefined);
     }
+    const sender = (await this.members.signatureOf(actor)) ?? actor.name;
 
     const saved = await this.broadcasts.create(
       {
@@ -83,7 +84,7 @@ export class BroadcastsUseCase {
                 ? {
                     subject: `Comunicado: ${draft.title}`,
                     intro: draft.body,
-                    details: [],
+                    details: [{ label: "Enviado por", value: sender }],
                     ctaLabel: "Abrir o app",
                   }
                 : null,
@@ -95,20 +96,11 @@ export class BroadcastsUseCase {
     );
     this.outbox.kick();
 
-    await this.audit.record({
+    await this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action: "broadcast.sent",
       entity: "broadcast",
       entityId: saved.id,
-      after: {
-        title: saved.title,
-        audience: saved.audience,
-        section: saved.section,
-        eventId: saved.eventId,
-        recipients: saved.recipients,
-        sendEmail: saved.sendEmail,
-      },
+      created: true,
     });
     return saved;
   }

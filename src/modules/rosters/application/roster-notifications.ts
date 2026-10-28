@@ -1,19 +1,10 @@
 import type { NotificationDelivery } from "@/modules/notifications/application/notification-delivery";
+import { UNIFORM_LABELS } from "@/modules/events/domain/event";
 import { formatVenueAddress } from "@/modules/events/domain/venue-address";
 import { NotificationType } from "@/modules/notifications/domain/notification";
 import type { BandEvent, Venue } from "@/modules/events/domain/event";
-import type { AssignmentRole } from "@/modules/rosters/domain/roster";
 import { eventWindow } from "@/modules/rosters/domain/roster";
 import { formatDateTime, formatTime } from "@/shared/domain/local-date";
-
-export const ROLE_LABELS: Record<AssignmentRole, string> = {
-  MUSICO: "Músico",
-  REGENTE: "Regente",
-  CHEFE_EQUIPE: "Chefe da equipe",
-  MOTORISTA: "Motorista",
-  SOM: "Som",
-  APOIO: "Apoio",
-};
 
 export type NoticeKind =
   | "published"
@@ -30,11 +21,14 @@ export type NoticeContext = {
   timeZone: string;
   /** Calendar SEQUENCE: must grow with every update of the same event. */
   sequence: number;
+  /** Who made the change (signature); null for automatic notices. */
+  by?: string | null;
 };
 
 /** The person's line on the roster (null when it no longer exists). */
 export type NoticeLine = {
-  role: AssignmentRole;
+  /** null = musician. */
+  functionName: string | null;
   instrumentName: string | null;
 } | null;
 
@@ -88,6 +82,25 @@ const KIND: Record<
   },
 };
 
+/** "sex., 30/10/2026" in the timezone (the times have their own lines). */
+const dayOf = (date: Date, timeZone: string) =>
+  new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+
+// The line that says who did it (reminders are automatic: none).
+const BY_LABEL: Partial<Record<NoticeKind, string>> = {
+  published: "Escalado por",
+  updated: "Alterado por",
+  removed: "Retirado por",
+  rescheduled: "Alterado por",
+  cancelled: "Cancelado por",
+};
+
 const isReminder = (kind: NoticeKind) =>
   kind === "reminder-tomorrow" || kind === "reminder-today";
 
@@ -96,7 +109,9 @@ const venueText = (venue: Venue | null) =>
 
 const roleText = (line: NoticeLine) =>
   line
-    ? [ROLE_LABELS[line.role], line.instrumentName].filter(Boolean).join(" · ")
+    ? [line.functionName ?? "Músico", line.instrumentName]
+        .filter(Boolean)
+        .join(" · ")
     : null;
 
 /** One person's notice about an event they are (or were) on. */
@@ -116,20 +131,26 @@ export function rosterNotice(
 
   const details = [
     { label: "Evento", value: event.title },
-    { label: "Data", value: when },
+    { label: "Data", value: dayOf(event.startsAt, timeZone) },
     ...(event.callTime
       ? [{ label: "Concentração", value: formatTime(event.callTime, timeZone) }]
       : []),
+    { label: "Início", value: formatTime(event.startsAt, timeZone) },
     ...(event.endsAt
       ? [{ label: "Término", value: formatTime(event.endsAt, timeZone) }]
       : []),
     ...(where ? [{ label: "Local", value: where }] : []),
-    ...(event.uniform ? [{ label: "Uniforme", value: event.uniform }] : []),
+    ...(event.uniform
+      ? [{ label: "Uniforme", value: UNIFORM_LABELS[event.uniform] }]
+      : []),
     ...(role && !removedFromCalendar
       ? [{ label: "Sua função", value: role }]
       : []),
     ...(kind === "cancelled" && event.cancellationReason
       ? [{ label: "Motivo", value: event.cancellationReason }]
+      : []),
+    ...(context.by && BY_LABEL[kind]
+      ? [{ label: BY_LABEL[kind], value: context.by }]
       : []),
   ];
 
@@ -165,7 +186,9 @@ export function rosterNotice(
           description:
             [
               role ? `Função: ${role}` : null,
-              event.uniform ? `Uniforme: ${event.uniform}` : null,
+              event.uniform
+                ? `Uniforme: ${UNIFORM_LABELS[event.uniform]}`
+                : null,
             ]
               .filter(Boolean)
               .join("\n") || null,
@@ -173,7 +196,10 @@ export function rosterNotice(
   };
 }
 
-/** To the manager who published: someone asked to be replaced. */
+/** Where managers answer swap requests (Escalas, "Pedidos de troca"). */
+export const SWAP_REQUESTS_LINK = "/escalas?aba=trocas";
+
+/** To the managers: someone asked to be replaced. */
 export function swapRequestNotice(
   managerId: string,
   requester: string,
@@ -186,16 +212,47 @@ export function swapRequestNotice(
     type: NotificationType.ROSTER_SWAP_REQUESTED,
     title: `${requester} pediu troca: ${context.event.title}`,
     body: note,
-    link: `/eventos/${context.event.id}`,
+    link: SWAP_REQUESTS_LINK,
     email: {
       subject: `Pedido de troca na escala: ${context.event.title}`,
-      intro: `${requester} pediu para ser substituído na escala do evento abaixo.`,
+      intro: `${requester} pediu para ser substituído na escala do evento abaixo. Substitua ou mantenha na escala pelo app.`,
       details: [
+        { label: "Quem", value: requester },
         { label: "Evento", value: context.event.title },
         { label: "Data", value: when },
         { label: "Motivo", value: note },
       ],
-      ctaLabel: "Ver a escala",
+      ctaLabel: "Ver os pedidos de troca",
+    },
+    calendar: null,
+  };
+}
+
+/** To the member: the swap was not accepted, they stay on the roster. */
+export function swapDeclinedNotice(
+  userId: string,
+  by: string,
+  note: string | null,
+  context: Omit<NoticeContext, "sequence">,
+): NotificationDelivery {
+  const { event, timeZone } = context;
+  return {
+    userId,
+    type: NotificationType.ROSTER_SWAP_DECLINED,
+    title: `Troca não aceita: ${event.title}`,
+    body: note ?? "Você continua na escala. Confirme a ciência.",
+    link: `/eventos/${event.id}`,
+    email: {
+      subject: `Seu pedido de troca não foi aceito: ${event.title}`,
+      intro: `${by} manteve você na escala do evento abaixo. Confirme a ciência no app.`,
+      details: [
+        { label: "Evento", value: event.title },
+        { label: "Data", value: dayOf(event.startsAt, timeZone) },
+        { label: "Início", value: formatTime(event.startsAt, timeZone) },
+        { label: "Mantido por", value: by },
+        ...(note ? [{ label: "Observação", value: note }] : []),
+      ],
+      ctaLabel: "Abrir no app",
     },
     calendar: null,
   };

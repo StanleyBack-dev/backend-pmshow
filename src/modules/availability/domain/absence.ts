@@ -32,6 +32,8 @@ export type Absence = {
   reviewNote: string | null;
   reviewedBy: string | null;
   reviewedAt: Date | null;
+  cancelledBy: string | null;
+  cancelledAt: Date | null;
   createdBy: string;
   createdAt: Date;
 };

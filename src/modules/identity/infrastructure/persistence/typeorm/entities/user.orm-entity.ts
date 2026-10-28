@@ -34,6 +34,9 @@ export class UserOrmEntity {
   @Column({ name: "last_login_at", type: "timestamptz", nullable: true })
   lastLoginAt!: Date | null;
 
+  @Column({ name: "avatar_key", type: "varchar", length: 200, nullable: true })
+  avatarKey!: string | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

@@ -5,9 +5,15 @@ import { AppException } from "@/common/exceptions/app-exception";
 import { AuditTrailService } from "@/modules/audit/application/audit-trail.service";
 import {
   INSTRUMENT_REPOSITORY,
+  type InstrumentFilter,
   type InstrumentRepositoryPort,
 } from "@/modules/members/application/ports/instrument-repository.port";
-import type { Instrument, Section } from "@/modules/members/domain/member";
+import type {
+  Instrument,
+  InstrumentListItem,
+  Section,
+} from "@/modules/members/domain/member";
+import type { PageRequest, Paginated } from "@/shared/application/pagination";
 
 // The instrument catalog (seeded by the migration). Instruments are archived,
 // never deleted, so past profiles and rosters keep their names.
@@ -23,6 +29,13 @@ export class InstrumentsUseCase {
     return this.instruments.list(includeArchived);
   }
 
+  page(
+    filter: InstrumentFilter,
+    page: PageRequest,
+  ): Promise<Paginated<InstrumentListItem>> {
+    return this.instruments.page(filter, page);
+  }
+
   async create(
     actor: AuthenticatedUser,
     input: { name: string; section: Section },
@@ -33,10 +46,7 @@ export class InstrumentsUseCase {
       name,
       section: input.section,
     });
-    await this.record(actor, "instrument.created", created.id, {
-      name,
-      section: input.section,
-    });
+    await this.stamp(actor, created.id, true);
     return created;
   }
 
@@ -58,11 +68,7 @@ export class InstrumentsUseCase {
       section: patch.section,
       archived: patch.archived,
     });
-    await this.record(actor, "instrument.updated", id, {
-      name: updated.name,
-      section: updated.section,
-      archived: updated.archived,
-    });
+    await this.stamp(actor, id);
     return updated;
   }
 
@@ -75,19 +81,16 @@ export class InstrumentsUseCase {
     }
   }
 
-  private record(
+  private stamp(
     actor: AuthenticatedUser,
-    action: string,
     id: string,
-    after: Record<string, unknown>,
+    created = false,
   ): Promise<void> {
-    return this.audit.record({
+    return this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action,
       entity: "instrument",
       entityId: id,
-      after,
+      created,
     });
   }
 }

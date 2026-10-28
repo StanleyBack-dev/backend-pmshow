@@ -85,7 +85,8 @@ export class EventsResolver {
 
   @RequirePermissions(Permission.EVENTS_READ)
   @Query(() => [EventGqlType], {
-    description: "Próximos eventos planejados ou confirmados.",
+    description:
+      "Próximos eventos planejados ou confirmados (sem os expedientes).",
   })
   upcomingEvents(
     @Args("limit", { type: () => Int, defaultValue: 5 }) limit: number,

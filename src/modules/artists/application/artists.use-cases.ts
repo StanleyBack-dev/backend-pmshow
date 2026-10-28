@@ -59,7 +59,7 @@ export class ArtistsUseCase {
       throw AppException.from(APP_ERRORS.artists.duplicate, undefined);
     }
     const artist = await this.artists.create(name, key, actor.id);
-    await this.record(actor, "artist.created", artist);
+    await this.stamp(actor, artist.id, true);
     return artist;
   }
 
@@ -83,7 +83,7 @@ export class ArtistsUseCase {
       key,
       archived: input.archived,
     });
-    await this.record(actor, "artist.updated", artist, current);
+    await this.stamp(actor, artist.id);
     return artist;
   }
 
@@ -95,20 +95,16 @@ export class ArtistsUseCase {
     return name;
   }
 
-  private record(
+  private stamp(
     actor: AuthenticatedUser,
-    action: string,
-    artist: Artist,
-    before?: Artist,
+    id: string,
+    created = false,
   ): Promise<void> {
-    return this.audit.record({
+    return this.audit.stamp({
       actorId: actor.id,
-      ip: actor.ipAddress,
-      action,
       entity: "artist",
-      entityId: artist.id,
-      before: before && { name: before.name, archived: before.archived },
-      after: { name: artist.name, archived: artist.archived },
+      entityId: id,
+      created,
     });
   }
 }

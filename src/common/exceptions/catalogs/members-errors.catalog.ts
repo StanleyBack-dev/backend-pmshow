@@ -36,6 +36,11 @@ export const membersErrors = {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     message: "Um dos instrumentos não existe ou foi arquivado.",
   },
+  unknownFunction: {
+    code: "MEMBER_UNKNOWN_FUNCTION",
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: "Uma das funções não existe ou foi arquivada.",
+  },
   instrumentNotFound: {
     code: "INSTRUMENT_NOT_FOUND",
     status: HttpStatus.NOT_FOUND,

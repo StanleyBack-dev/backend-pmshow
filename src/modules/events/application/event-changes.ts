@@ -10,6 +10,8 @@ export type EventChange = {
   eventId: string;
   /** Time or venue changed / event cancelled. */
   change: "RESCHEDULED" | "CANCELLED";
+  /** Who changed it (absent in messages queued before it existed). */
+  actorId?: string;
 };
 
 export const eventChangedDraft = (change: EventChange): OutboxDraft => ({
