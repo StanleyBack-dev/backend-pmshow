@@ -12,7 +12,17 @@ export type PushMessage = {
   url: string;
   /** Same tag = a newer notification replaces the older one. */
   tag: string;
+  /**
+   * Buttons on the notification (Chrome/Edge/Firefox; Safari shows none and
+   * a tap still opens `url`). The service worker knows each action.
+   */
+  actions?: { action: PushAction; title: string }[];
+  /** What the actions need (e.g. the event to acknowledge). */
+  eventId?: string;
 };
+
+/** Actions the service worker (public/sw.js) handles. */
+export type PushAction = "ack" | "open";
 
 export interface PushSenderPort {
   /** null when VAPID keys are not configured (push disabled). */

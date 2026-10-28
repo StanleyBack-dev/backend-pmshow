@@ -66,6 +66,9 @@ export class EnrollmentRequestOrmEntity {
   @Column({ name: "war_name", type: "varchar", length: 60 })
   warName!: string;
 
+  @Column({ name: "birth_date", type: "date", nullable: true })
+  birthDate!: string | null;
+
   @Column({ type: "jsonb" })
   instruments!: EnrollmentInstrumentChoice[];
 

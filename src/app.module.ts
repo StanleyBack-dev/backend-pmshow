@@ -19,6 +19,8 @@ import { AuditModule } from "@/modules/audit/audit.module";
 import { AvailabilityModule } from "@/modules/availability/availability.module";
 import { BroadcastsModule } from "@/modules/broadcasts/broadcasts.module";
 import { SupportModule } from "@/modules/support/support.module";
+import { SystemLogsModule } from "@/modules/system-logs/system-logs.module";
+import { PlaylistsModule } from "@/modules/playlists/playlists.module";
 import { DashboardModule } from "@/modules/dashboard/dashboard.module";
 import { IdentityModule } from "@/modules/identity/identity.module";
 import { FirstAccessGuard } from "@/modules/identity/presentation/guards/first-access.guard";
@@ -61,6 +63,8 @@ import { SharedModule } from "@/shared/shared.module";
     DutySchedulesModule,
     BroadcastsModule,
     SupportModule,
+    SystemLogsModule,
+    PlaylistsModule,
     DashboardModule,
     MaintenanceModule,
   ],

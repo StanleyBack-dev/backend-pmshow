@@ -34,12 +34,33 @@ export type MemberProfileData = {
   section: Section;
   status: MemberStatus;
   notes: string | null;
+  birthDate: string | null;
+  joinedOn: string | null;
   instruments: { instrumentId: string; primary: boolean }[];
   /** undefined = keep the functions the profile already has. */
   functionIds?: string[];
 };
 
+/** Birthday and band start date (YYYY-MM-DD), kept on the user. */
+export type BandDates = { birthDate: string | null; joinedOn: string | null };
+
+/** A birthday of the month (home page). */
+export type Birthday = {
+  userId: string;
+  name: string;
+  /** The user's name when there is no band profile. */
+  warName: string;
+  rank: MemberProfile["rank"] | null;
+  /** Day of the month. */
+  day: number;
+};
+
 export interface MemberRepositoryPort {
+  /** Active users (and active members) born in `month` (1-12), by day. */
+  birthdaysIn(month: number): Promise<Birthday[]>;
+  /** Anyone's dates, with or without a band profile. */
+  datesOf(userId: string): Promise<BandDates>;
+  saveDates(userId: string, dates: BandDates): Promise<void>;
   listRoster(
     filter: RosterFilter,
     page: PageRequest,

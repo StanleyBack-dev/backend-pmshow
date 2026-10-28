@@ -2,10 +2,12 @@ import { Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource, EntityManager } from "typeorm";
 import type {
+  Birthday,
   MemberProfileData,
   MemberRepositoryPort,
   RosterEntry,
   RosterFilter,
+  BandDates,
 } from "@/modules/members/application/ports/member-repository.port";
 import type {
   MemberFunction,
@@ -35,8 +37,14 @@ type RosterRow = {
   section: MemberProfile["section"] | null;
   status: MemberProfile["status"] | null;
   notes: string | null;
+  birth_date: string | null;
+  joined_on: string | null;
   updated_at: Date | null;
 };
+
+// The dates live on the user (everyone has them, band profile or not).
+const DATES = `to_char(u.birth_date, 'YYYY-MM-DD') AS birth_date,
+               to_char(u.joined_on, 'YYYY-MM-DD') AS joined_on`;
 
 type FunctionRow = {
   user_id: string;
@@ -107,7 +115,7 @@ export class MemberTypeormRepository implements MemberRepositoryPort {
       this.dataSource.query<RosterRow[]>(
         `SELECT u.idtb_users AS user_id, u.name, u.username, u.active,
                 m.war_name, m.rank, m.registration, m.phone, m.section,
-                m.status, m.notes, m.updated_at
+                m.status, m.notes, m.updated_at, ${DATES}
            ${from}
           ORDER BY u.active DESC, coalesce(m.war_name, upper(u.name))
           LIMIT ${limit} OFFSET ${offset}`,
@@ -140,8 +148,10 @@ export class MemberTypeormRepository implements MemberRepositoryPort {
   async findProfile(userId: string): Promise<MemberProfile | null> {
     const rows = await this.dataSource.query<RosterRow[]>(
       `SELECT m.idtb_users AS user_id, m.war_name, m.rank, m.registration,
-              m.phone, m.section, m.status, m.notes, m.updated_at
-         FROM tb_members m WHERE m.idtb_users = $1`,
+              m.phone, m.section, m.status, m.notes, m.updated_at, ${DATES}
+         FROM tb_members m
+         JOIN tb_users u ON u.idtb_users = m.idtb_users
+        WHERE m.idtb_users = $1`,
       [userId],
     );
     if (!rows[0]) return null;
@@ -150,6 +160,42 @@ export class MemberTypeormRepository implements MemberRepositoryPort {
       this.functionsOf([userId]),
     ]);
     return toProfile(rows[0], instruments, functions);
+  }
+
+  async birthdaysIn(month: number): Promise<Birthday[]> {
+    const rows = await this.dataSource.query<
+      (Omit<Birthday, "day"> & { day: number })[]
+    >(
+      `SELECT u.idtb_users AS "userId", u.name,
+              coalesce(m.war_name, u.name) AS "warName",
+              m.rank, extract(day FROM u.birth_date)::int AS day
+         FROM tb_users u
+         LEFT JOIN tb_members m ON m.idtb_users = u.idtb_users
+        WHERE u.active
+          AND (m.idtb_users IS NULL OR m.status = 'ATIVO')
+          AND extract(month FROM u.birth_date) = $1
+        ORDER BY day, "warName"`,
+      [month],
+    );
+    return rows;
+  }
+
+  async datesOf(userId: string): Promise<BandDates> {
+    const rows = await this.dataSource.query<BandDates[]>(
+      `SELECT to_char(birth_date, 'YYYY-MM-DD') AS "birthDate",
+              to_char(joined_on, 'YYYY-MM-DD') AS "joinedOn"
+         FROM tb_users WHERE idtb_users = $1`,
+      [userId],
+    );
+    return rows[0] ?? { birthDate: null, joinedOn: null };
+  }
+
+  async saveDates(userId: string, dates: BandDates): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE tb_users SET birth_date = $2, joined_on = $3
+        WHERE idtb_users = $1`,
+      [userId, dates.birthDate, dates.joinedOn],
+    );
   }
 
   async findUserIdByRegistration(registration: string): Promise<string | null> {
@@ -174,6 +220,11 @@ export class MemberTypeormRepository implements MemberRepositoryPort {
         status: data.status,
         notes: data.notes,
       });
+      await manager.query(
+        `UPDATE tb_users SET birth_date = $2, joined_on = $3
+          WHERE idtb_users = $1`,
+        [userId, data.birthDate, data.joinedOn],
+      );
       const links = manager.getRepository(MemberInstrumentOrmEntity);
       await links.delete({ userId });
       if (data.instruments.length > 0) {
@@ -264,6 +315,8 @@ function toProfile(
     section: row.section as MemberProfile["section"],
     status: row.status as MemberProfile["status"],
     notes: row.notes,
+    birthDate: row.birth_date,
+    joinedOn: row.joined_on,
     instruments: instruments.get(row.user_id) ?? [],
     functions: functions.get(row.user_id) ?? [],
     updatedAt: row.updated_at as Date,

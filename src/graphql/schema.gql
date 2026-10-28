@@ -429,6 +429,12 @@ type MemberProfile {
   section: Section!
   status: MemberStatus!
   notes: String
+
+  """AAAA-MM-DD."""
+  birthDate: String
+
+  """Ingresso na banda (AAAA-MM-DD)."""
+  joinedOn: String
   instruments: [MemberInstrument!]!
   functions: [MemberFunction!]!
   updatedAt: DateTime!
@@ -480,6 +486,28 @@ type RosterPage {
   page: Int!
   limit: Int!
   totalPages: Int!
+}
+
+"""Aniversário e ingresso na banda (YYYY-MM-DD), de qualquer usuário."""
+type BandDates {
+  birthDate: String
+  joinedOn: String
+}
+
+"""Aniversariante do mês."""
+type Birthday {
+  userId: ID!
+  name: String!
+  warName: String!
+
+  """Vazio para quem não tem cadastro na banda."""
+  rank: Rank
+
+  """Dia do mês."""
+  day: Int!
+
+  """Link temporário da foto de perfil (null: sem foto)."""
+  photoUrl: String
 }
 
 """Expediente lançado (semana ou mês de dias de trabalho)."""
@@ -721,6 +749,9 @@ type EnrollmentRequest {
   militaryId: String
   rank: Rank!
   warName: String!
+
+  """AAAA-MM-DD."""
+  birthDate: String
   instruments: [EnrollmentInstrumentChoice!]!
   createdAt: DateTime!
   reviewedAt: DateTime
@@ -851,6 +882,7 @@ enum NotificationType {
   SUPPORT_REQUESTED
   SUPPORT_ANSWERED
   SUPPORT_FINALIZED
+  SYSTEM_ALERT
   ENROLLMENT_SUBMITTED
 }
 
@@ -867,6 +899,30 @@ type NotificationPreference {
 
   """Também recebe por e-mail."""
   emailEnabled: Boolean!
+}
+
+"""Música da playlist, na ordem."""
+type PlaylistSong {
+  position: Int!
+  songId: ID!
+
+  """null se a música foi apagada."""
+  song: Song
+}
+
+"""Lista de músicas para ensaiar (tocadas em sequência)."""
+type Playlist {
+  id: ID!
+  name: String!
+  description: String
+
+  """Visível (só para tocar) para toda a banda."""
+  shared: Boolean!
+  ownerId: ID!
+  ownerName: String!
+  songCount: Int!
+  songs: [PlaylistSong!]!
+  updatedAt: DateTime!
 }
 
 """Situação e tamanho da escala (listas de eventos)."""
@@ -1036,6 +1092,13 @@ type MyAssignmentCounts {
   duty: Int!
 }
 
+"""Link pessoal da agenda (iCal) para o celular ou o Google."""
+type CalendarFeed {
+  """Vai no endereço do link; não compartilhe."""
+  token: String!
+  createdAt: DateTime!
+}
+
 """Solicitação de suporte."""
 type SupportRequest {
   id: ID!
@@ -1085,6 +1148,41 @@ type SupportQuota {
 
 type SupportRequestPage {
   items: [SupportRequest!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+"""Registro do log do sistema."""
+type SystemLog {
+  id: ID!
+
+  """INFO, WARN, ERROR ou CRITICAL."""
+  level: String!
+
+  """API, DATABASE, AUTH, SECURITY, OUTBOX, ROUTINE…"""
+  category: String!
+  source: String!
+  message: String!
+  details: JSON
+  userId: ID
+  userName: String
+  ip: String
+  statusCode: Int
+  durationMs: Int
+  environment: String!
+  createdAt: DateTime!
+}
+
+type SystemLogSummary {
+  level: String!
+  last24h: Int!
+  last7d: Int!
+}
+
+type SystemLogPage {
+  items: [SystemLog!]!
   total: Int!
   page: Int!
   limit: Int!
@@ -1170,6 +1268,12 @@ type Query {
 
   """O cadastro do próprio usuário na banda."""
   myMemberProfile: MemberProfile
+
+  """Aniversariantes do mês (1-12; padrão: o mês atual)."""
+  birthdays(month: Int): [Birthday!]!
+
+  """Aniversário e ingresso na banda do próprio usuário."""
+  myBandDates: BandDates!
   instruments(includeArchived: Boolean! = false): [Instrument!]!
 
   """Página do catálogo de instrumentos: busca, naipe, arquivados."""
@@ -1182,6 +1286,10 @@ type Query {
 
   """Chave VAPID para o navegador assinar o push (null = desligado)."""
   pushPublicKey: String
+
+  """Minhas playlists e as compartilhadas com a banda."""
+  playlists: [Playlist!]!
+  playlist(id: ID!): Playlist!
   songs(filter: SongFilterInput, page: PageInput): SongPage!
   song(id: ID!): Song!
 
@@ -1193,6 +1301,12 @@ type Query {
 
   """Letra completa num catálogo (null = não encontrada)."""
   findLyrics(artist: String!, title: String!): LyricsResult
+
+  """Meu link de agenda (null: ainda não criado)."""
+  myCalendarFeed: CalendarFeed
+
+  """A agenda (texto iCalendar) de um link; null se o link não existe mais."""
+  calendarFeedIcs(token: String!): String
 
   """
   Escala do evento. Rascunhos só para quem vê todas; publicada para todos (sem contatos para quem não é gestor).
@@ -1227,6 +1341,12 @@ type Query {
 
   """Todas as solicitações de suporte (administração)."""
   supportRequests(status: SupportStatus, page: PageInput): SupportRequestPage!
+
+  """Log do sistema (administração), do mais recente."""
+  systemLogs(filter: SystemLogFilterInput, page: PageInput): SystemLogPage!
+
+  """Quantos registros por nível nas últimas 24 h e 7 dias."""
+  systemLogSummary: [SystemLogSummary!]!
 }
 
 input ArtistFilterInput {
@@ -1359,6 +1479,15 @@ enum MyAssignmentTab {
   DUTY
 }
 
+input SystemLogFilterInput {
+  from: DateTime
+  to: DateTime
+  levels: [String!]
+  categories: [String!]
+  search: String
+  environment: String
+}
+
 type Mutation {
   createArtist(input: ArtistInput!): Artist!
   updateArtist(id: ID!, input: ArtistInput!): Artist!
@@ -1462,6 +1591,11 @@ type Mutation {
   renameMedia(id: ID!, title: String!): MediaAsset!
   removeMedia(id: ID!): Boolean!
 
+  """
+  O próprio usuário informa o aniversário e a data de ingresso na banda (opcionais).
+  """
+  updateMyBandDates(birthDate: String, joinedOn: String): BandDates!
+
   """Cria ou atualiza o cadastro do integrante."""
   saveMemberProfile(userId: ID!, input: MemberProfileInput!): MemberProfile!
   createInstrument(input: CreateInstrumentInput!): Instrument!
@@ -1480,6 +1614,13 @@ type Mutation {
 
   """Envia um push de teste; devolve quantos aparelhos receberam."""
   sendTestPush: Int!
+  createPlaylist(input: PlaylistInput!): Playlist!
+
+  """Só quem criou altera."""
+  updatePlaylist(id: ID!, input: PlaylistInput!): Playlist!
+
+  """Só quem criou apaga."""
+  deletePlaylist(id: ID!): Boolean!
 
   """
   Troca a própria foto de perfil (base64, já reduzida pelo navegador). Devolve o link temporário.
@@ -1493,6 +1634,12 @@ type Mutation {
 
   """Arquiva (some das listas) ou restaura a música."""
   setSongArchived(id: ID!, archived: Boolean!): Song!
+
+  """Cria um novo link de agenda; o anterior para de funcionar."""
+  renewCalendarFeed: CalendarFeed!
+
+  """Desativa o link de agenda."""
+  removeCalendarFeed: Boolean!
 
   """
   Substitui a lista da escala. Publicada: notifica só quem entrou, saiu ou mudou de função.
@@ -1520,6 +1667,9 @@ type Mutation {
 
   """Finaliza a solicitação; quem pediu é avisado."""
   finalizeSupportRequest(id: ID!): SupportRequest!
+
+  """Erro de tela do app (o frontend avisa para o log do sistema)."""
+  reportClientError(message: String!, url: String!, digest: String): Boolean!
 }
 
 input ArtistInput {
@@ -1622,6 +1772,9 @@ input EnrollmentDataInput {
   militaryId: String
   rank: Rank
   warName: String!
+
+  """Data de nascimento (AAAA-MM-DD)."""
+  birthDate: String!
   instruments: [EnrollmentInstrumentInput!]!
 }
 
@@ -1776,6 +1929,12 @@ input MemberProfileInput {
   notes: String
   instruments: [MemberInstrumentInput!]!
 
+  """AAAA-MM-DD; ausente = mantém a atual."""
+  birthDate: String
+
+  """Ingresso na banda (AAAA-MM-DD); ausente = mantém."""
+  joinedOn: String
+
   """Funções na banda; ausente = mantém as atuais."""
   functionIds: [ID!]
 }
@@ -1805,6 +1964,15 @@ input PushSubscriptionInput {
 
   """Segredo de autenticação (base64url)."""
   auth: String!
+}
+
+input PlaylistInput {
+  name: String!
+  description: String
+  shared: Boolean!
+
+  """Músicas na ordem em que tocam."""
+  songIds: [ID!]!
 }
 
 input SongInput {

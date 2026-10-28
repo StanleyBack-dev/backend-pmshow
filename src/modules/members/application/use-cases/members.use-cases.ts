@@ -11,10 +11,12 @@ import {
 } from "@/modules/members/application/ports/instrument-repository.port";
 import {
   MEMBER_REPOSITORY,
+  type Birthday,
   type MemberProfileData,
   type MemberRepositoryPort,
   type RosterEntry,
   type RosterFilter,
+  type BandDates,
 } from "@/modules/members/application/ports/member-repository.port";
 import {
   normalizeInstrumentSelection,
@@ -26,7 +28,19 @@ import {
   type Rank,
   type Section,
 } from "@/modules/members/domain/member";
+import {
+  BIRTH_DATE_MESSAGES,
+  JOINED_ON_MESSAGES,
+  checkBirthDate,
+  checkJoinedOn,
+} from "@/modules/members/domain/member-dates";
 import type { PageRequest, Paginated } from "@/shared/application/pagination";
+
+/** Today in the app's timezone (Goiás), YYYY-MM-DD. */
+const localToday = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(
+    new Date(),
+  );
 
 export type MemberProfileInput = {
   warName: string;
@@ -39,6 +53,9 @@ export type MemberProfileInput = {
   instruments: { instrumentId: string; primary: boolean }[];
   /** undefined = keep the functions the profile already has. */
   functionIds?: string[];
+  /** YYYY-MM-DD; undefined = keep the current one. */
+  birthDate?: string | null;
+  joinedOn?: string | null;
 };
 
 @Injectable()
@@ -89,6 +106,51 @@ export class MembersUseCase {
     ]);
     if (!name) return null;
     return profile?.warName ? `${name} (${profile.warName})` : name;
+  }
+
+  /** The month's birthdays (1-12; default: this month). */
+  birthdays(month: number): Promise<Birthday[]> {
+    return this.members.birthdaysIn(month);
+  }
+
+  /** The member fills in their own birthday and band start date. */
+  async saveOwnDates(
+    actor: AuthenticatedUser,
+    dates: BandDates,
+  ): Promise<BandDates> {
+    const today = localToday();
+    this.checkDates(dates.birthDate, dates.joinedOn, today);
+    await this.members.saveDates(actor.id, dates);
+    await this.audit.stamp({
+      actorId: actor.id,
+      entity: "user",
+      entityId: actor.id,
+    });
+    return this.members.datesOf(actor.id);
+  }
+
+  /** Anyone's own dates ("Meu perfil"), with or without a band profile. */
+  myDates(actor: AuthenticatedUser): Promise<BandDates> {
+    return this.members.datesOf(actor.id);
+  }
+
+  private checkDates(
+    birthDate: string | null | undefined,
+    joinedOn: string | null | undefined,
+    today: string,
+  ): void {
+    const birth = birthDate ? checkBirthDate(birthDate, today) : null;
+    if (birth) {
+      throw AppException.from(APP_ERRORS.members.invalidDate, {
+        reason: BIRTH_DATE_MESSAGES[birth],
+      });
+    }
+    const joined = joinedOn ? checkJoinedOn(joinedOn, today) : null;
+    if (joined) {
+      throw AppException.from(APP_ERRORS.members.invalidDate, {
+        reason: JOINED_ON_MESSAGES[joined],
+      });
+    }
   }
 
   async save(
@@ -174,6 +236,21 @@ export class MembersUseCase {
       }
     }
 
+    this.checkDates(input.birthDate, input.joinedOn, localToday());
+    // Omitted = keep what the user already has (also without a profile yet).
+    const current =
+      input.birthDate === undefined || input.joinedOn === undefined
+        ? (before ?? (await this.members.datesOf(userId)))
+        : null;
+    const birthDate =
+      input.birthDate === undefined
+        ? (current?.birthDate ?? null)
+        : input.birthDate || null;
+    const joinedOn =
+      input.joinedOn === undefined
+        ? (current?.joinedOn ?? null)
+        : input.joinedOn || null;
+
     return {
       warName: normalizeWarName(input.warName),
       rank: input.rank,
@@ -182,6 +259,8 @@ export class MembersUseCase {
       section: input.section,
       status: input.status,
       notes: input.notes?.trim() || null,
+      birthDate,
+      joinedOn,
       instruments,
       functionIds,
     };

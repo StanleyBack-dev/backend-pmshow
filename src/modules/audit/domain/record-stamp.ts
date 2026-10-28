@@ -25,6 +25,7 @@ export const STAMPED_TABLES = {
     table: "tb_enrollment_requests",
     key: "idtb_enrollment_requests",
   },
+  playlist: { table: "tb_playlists", key: "idtb_playlists" },
   support_request: {
     table: "tb_support_requests",
     key: "idtb_support_requests",

@@ -77,3 +77,47 @@ export function buildIcs(entry: CalendarEntry, now: Date): string {
       .join("\r\n") + "\r\n"
   );
 }
+
+/**
+ * A whole calendar to subscribe to (the person's agenda link): every entry
+ * as a VEVENT, cancelled ones marked as such. Calendar apps poll the link
+ * and keep their copy in sync by UID.
+ */
+export function buildCalendarFeed(
+  name: string,
+  entries: readonly CalendarEntry[],
+  now: Date,
+): string {
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//PM SHOW//Agenda//PT-BR",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    `X-WR-CALNAME:${escapeText(name)}`,
+    "X-WR-TIMEZONE:America/Sao_Paulo",
+    // Hint for how often apps should look again (they decide).
+    "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+    "X-PUBLISHED-TTL:PT1H",
+    ...entries.flatMap((entry) =>
+      [
+        "BEGIN:VEVENT",
+        `UID:${entry.uid}`,
+        `SEQUENCE:${entry.sequence}`,
+        `DTSTAMP:${stamp(now)}`,
+        `DTSTART:${stamp(entry.start)}`,
+        `DTEND:${stamp(entry.end)}`,
+        `SUMMARY:${escapeText(entry.summary)}`,
+        entry.location ? `LOCATION:${escapeText(entry.location)}` : null,
+        entry.description
+          ? `DESCRIPTION:${escapeText(entry.description)}`
+          : null,
+        entry.url ? `URL:${entry.url}` : null,
+        `STATUS:${entry.cancelled ? "CANCELLED" : "CONFIRMED"}`,
+        "END:VEVENT",
+      ].filter((line): line is string => line !== null),
+    ),
+    "END:VCALENDAR",
+  ];
+  return lines.map(foldLine).join("\r\n") + "\r\n";
+}

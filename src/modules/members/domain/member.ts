@@ -60,6 +60,10 @@ export type MemberProfile = {
   section: Section;
   status: MemberStatus;
   notes: string | null;
+  /** YYYY-MM-DD (null: not filled in yet). */
+  birthDate: string | null;
+  /** When the person joined the band, YYYY-MM-DD (null: not filled in). */
+  joinedOn: string | null;
   instruments: MemberInstrument[];
   functions: MemberFunction[];
   updatedAt: Date;

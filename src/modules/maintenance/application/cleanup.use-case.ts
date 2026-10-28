@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { IdentityMaintenanceService } from "@/modules/identity/application/identity-maintenance.service";
 import { NotificationsUseCase } from "@/modules/notifications/application/notifications.use-cases";
 import { OutboxDispatcher } from "@/modules/outbox/application/outbox-dispatcher.service";
+import { SystemLogsService } from "@/modules/system-logs/application/system-logs.service";
 import { CLOCK, type ClockPort } from "@/shared/application/ports/clock.port";
 import {
   RATE_LIMIT,
@@ -14,6 +15,7 @@ export type CleanupReport = {
   deliveredMessages: number;
   readNotifications: number;
   rateLimitWindows: number;
+  systemLogs: number;
 };
 
 const DELIVERED_RETENTION_DAYS = 30;
@@ -31,25 +33,33 @@ export class CleanupUseCase {
     private readonly identity: IdentityMaintenanceService,
     private readonly notifications: NotificationsUseCase,
     private readonly outbox: OutboxDispatcher,
+    private readonly systemLogs: SystemLogsService,
   ) {}
 
   async run(): Promise<CleanupReport> {
     const now = this.clock.now();
-    const [identity, deliveredMessages, readNotifications, rateLimitWindows] =
-      await Promise.all([
-        this.identity.purge(now),
-        this.outbox.purgeDelivered(
-          new Date(now.getTime() - DELIVERED_RETENTION_DAYS * 86_400_000),
-        ),
-        this.notifications.purgeOldRead(now),
-        this.rateLimits.purgeEndedBefore(now),
-      ]);
+    const [
+      identity,
+      deliveredMessages,
+      readNotifications,
+      rateLimitWindows,
+      systemLogs,
+    ] = await Promise.all([
+      this.identity.purge(now),
+      this.outbox.purgeDelivered(
+        new Date(now.getTime() - DELIVERED_RETENTION_DAYS * 86_400_000),
+      ),
+      this.notifications.purgeOldRead(now),
+      this.rateLimits.purgeEndedBefore(now),
+      this.systemLogs.purgeOld(now),
+    ]);
     const report = {
       sessions: identity.sessions,
       verificationCodes: identity.codes,
       deliveredMessages,
       readNotifications,
       rateLimitWindows,
+      systemLogs,
     };
     this.logger.log(`Limpeza diária: ${JSON.stringify(report)}`);
     return report;

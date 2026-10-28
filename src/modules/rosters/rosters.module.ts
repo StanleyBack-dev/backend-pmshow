@@ -9,7 +9,12 @@ import { IdentityModule } from "@/modules/identity/identity.module";
 import { MembersModule } from "@/modules/members/members.module";
 import { OutboxModule } from "@/modules/outbox/outbox.module";
 import { ROSTER_REPOSITORY } from "@/modules/rosters/application/ports/roster-repository.port";
+import { CalendarFeedsUseCase } from "@/modules/rosters/application/calendar-feeds.use-case";
+import { CALENDAR_FEED_REPOSITORY } from "@/modules/rosters/application/ports/calendar-feed-repository.port";
 import { RostersUseCase } from "@/modules/rosters/application/rosters.use-cases";
+import { CalendarFeedOrmEntity } from "@/modules/rosters/infrastructure/persistence/typeorm/calendar-feed.orm-entity";
+import { CalendarFeedTypeormRepository } from "@/modules/rosters/infrastructure/persistence/typeorm/calendar-feed-typeorm.repository";
+import { CalendarFeedsResolver } from "@/modules/rosters/presentation/graphql/calendar-feeds.resolver";
 import {
   RosterAssignmentOrmEntity,
   RosterOrmEntity,
@@ -27,7 +32,11 @@ import { InternalRostersController } from "@/modules/rosters/presentation/rest/i
 // absences through their use cases; notifies through the outbox.
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RosterOrmEntity, RosterAssignmentOrmEntity]),
+    TypeOrmModule.forFeature([
+      RosterOrmEntity,
+      RosterAssignmentOrmEntity,
+      CalendarFeedOrmEntity,
+    ]),
     AccessControlModule,
     AuditModule,
     AvailabilityModule,
@@ -40,6 +49,12 @@ import { InternalRostersController } from "@/modules/rosters/presentation/rest/i
   controllers: [InternalRostersController],
   providers: [
     RostersUseCase,
+    CalendarFeedsUseCase,
+    CalendarFeedsResolver,
+    {
+      provide: CALENDAR_FEED_REPOSITORY,
+      useClass: CalendarFeedTypeormRepository,
+    },
     RostersResolver,
     EventRosterFieldResolver,
     AssignmentFieldsResolver,

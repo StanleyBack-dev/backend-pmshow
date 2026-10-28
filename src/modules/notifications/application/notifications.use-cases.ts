@@ -7,6 +7,7 @@ import {
   NOTIFICATION_TOPIC,
   type NotificationDelivery,
 } from "@/modules/notifications/application/notification-delivery";
+import type { PushMessage } from "@/modules/notifications/application/ports/push.ports";
 import { PushNotificationsService } from "@/modules/notifications/application/push-notifications.service";
 import {
   NOTIFICATION_REPOSITORY,
@@ -16,8 +17,8 @@ import { buildIcs } from "@/modules/notifications/domain/ics";
 import {
   ALL_NOTIFICATION_TYPES,
   emailEnabled,
+  NotificationType,
   type Notification,
-  type NotificationType,
 } from "@/modules/notifications/domain/notification";
 import { OutboxHandlers } from "@/modules/outbox/application/outbox-handlers";
 import type { OutboxMessage } from "@/modules/outbox/domain/outbox";
@@ -28,6 +29,33 @@ export type NotificationPreference = {
   type: NotificationType;
   emailEnabled: boolean;
 };
+
+/** Notices that ask for a "ciente" on an event's roster. */
+const ACK_NOTICES = new Set<NotificationType>([
+  NotificationType.ROSTER_PUBLISHED,
+  NotificationType.ROSTER_UPDATED,
+  NotificationType.ROSTER_SWAP_DECLINED,
+]);
+
+/**
+ * Buttons of the push: on a roster notice, "Estou ciente" (answered by the
+ * service worker, without opening the app) and "Ver evento".
+ */
+function pushActionsFor(
+  delivery: NotificationDelivery,
+): Pick<PushMessage, "actions" | "eventId"> {
+  const eventId = /^\/eventos\/([0-9a-f-]{36})$/i.exec(
+    delivery.link ?? "",
+  )?.[1];
+  if (!eventId || !ACK_NOTICES.has(delivery.type)) return {};
+  return {
+    eventId,
+    actions: [
+      { action: "ack", title: "Estou ciente" },
+      { action: "open", title: "Ver evento" },
+    ],
+  };
+}
 
 @Injectable()
 export class NotificationsUseCase implements OnModuleInit {
@@ -78,6 +106,7 @@ export class NotificationsUseCase implements OnModuleInit {
       url: delivery.link ?? "/notificacoes",
       // A newer notice about the same thing replaces the older one.
       tag: `${delivery.type}:${delivery.link ?? message.id}`,
+      ...pushActionsFor(delivery),
     });
   }
 

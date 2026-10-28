@@ -113,6 +113,7 @@ const form = {
   militaryId: "12.345",
   rank: Rank.TERCEIRO_SARGENTO,
   warName: "silva",
+  birthDate: "1990-05-12",
   instruments: [{ instrumentId: INSTRUMENT, primary: true }],
 };
 

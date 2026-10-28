@@ -15,6 +15,7 @@ import { mediaErrors } from "@/common/exceptions/catalogs/media-errors.catalog";
 import { membersErrors } from "@/common/exceptions/catalogs/members-errors.catalog";
 import { notificationsErrors } from "@/common/exceptions/catalogs/notifications-errors.catalog";
 import { repertoireErrors } from "@/common/exceptions/catalogs/repertoire-errors.catalog";
+import { playlistsErrors } from "@/common/exceptions/catalogs/playlists-errors.catalog";
 import { rostersErrors } from "@/common/exceptions/catalogs/rosters-errors.catalog";
 import { supportErrors } from "@/common/exceptions/catalogs/support-errors.catalog";
 
@@ -35,6 +36,7 @@ export const APP_ERRORS = {
   members: membersErrors,
   notifications: notificationsErrors,
   repertoire: repertoireErrors,
+  playlists: playlistsErrors,
   rosters: rostersErrors,
   support: supportErrors,
 } as const satisfies Record<string, Record<string, AppErrorDefinition<never>>>;
