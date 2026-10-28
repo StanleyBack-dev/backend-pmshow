@@ -37,6 +37,13 @@ export class UserOrmEntity {
   @Column({ name: "avatar_key", type: "varchar", length: 200, nullable: true })
   avatarKey!: string | null;
 
+  @Column({
+    name: "onboarding_completed_at",
+    type: "timestamptz",
+    nullable: true,
+  })
+  onboardingCompletedAt!: Date | null;
+
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;
 

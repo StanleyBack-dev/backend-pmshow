@@ -140,6 +140,9 @@ type Absence {
   registered: Boolean!
   createdAt: DateTime!
   attachments: [AbsenceAttachment!]!
+
+  """Link temporário da foto de perfil (null: sem foto)."""
+  photoUrl: String
 }
 
 """Motivo da indisponibilidade."""
@@ -466,6 +469,9 @@ type RosterEntry {
   """Se o acesso ao app está ativo."""
   active: Boolean!
   profile: MemberProfile
+
+  """Link temporário da foto de perfil (null: sem foto)."""
+  photoUrl: String
 }
 
 type RosterPage {
@@ -611,6 +617,9 @@ type SessionUser {
 
   """Permissões efetivas."""
   permissions: [Permission!]!
+
+  """Já viu (ou pulou) a apresentação guiada do app."""
+  onboardingCompleted: Boolean!
 
   """Link temporário da foto de perfil (null: sem foto)."""
   photoUrl: String
@@ -972,6 +981,9 @@ type RosterCandidate {
 
   """Outros eventos no mesmo horário (alerta, não bloqueia)."""
   busyWith: [BusyWith!]!
+
+  """Link temporário da foto de perfil (null: sem foto)."""
+  photoUrl: String
 }
 
 """Por que a pessoa não pode ser escalada."""
@@ -1001,6 +1013,9 @@ type RosterPerson {
   """Só dígitos (DDD + número)."""
   phone: String
   section: Section!
+
+  """Link temporário da foto de perfil (null: sem foto)."""
+  photoUrl: String
 }
 
 type MyAssignmentPage {
@@ -1419,6 +1434,9 @@ type Mutation {
   """Confere o código e devolve o token para redefinir a senha."""
   verifyPasswordRecoveryCode(input: VerifyRecoveryCodeInput!): String!
   resetPasswordWithRecovery(input: ResetPasswordInput!): Boolean!
+
+  """Marca a apresentação guiada como vista (concluída ou pulada)."""
+  completeOnboarding: Boolean!
 
   """Cria o usuário com senha temporária (enviada por e-mail)."""
   createUser(input: CreateUserInput!): TemporaryAccess!

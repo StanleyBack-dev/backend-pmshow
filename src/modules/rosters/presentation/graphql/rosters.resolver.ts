@@ -50,7 +50,7 @@ import {
 const Id = () => new ParseUUIDPipe({ version: "4" });
 
 @ObjectType("RosterPerson", { description: "Quem está na linha da escala." })
-class RosterPersonType {
+export class RosterPersonType {
   @Field()
   name!: string;
 
@@ -106,6 +106,8 @@ registerEnumType(MyAssignmentTabEnum, {
 
 // Instruments ride along (not exposed) to name the line's instrument.
 type RosterPerson = RosterPersonType & {
+  /** Not exposed: who it is (the photo resolver needs it). */
+  userId: string;
   instruments: { instrumentId: string; name: string }[];
 };
 
@@ -387,6 +389,7 @@ function loadPerson(
       band.map((entry) => [
         entry.userId,
         {
+          userId: entry.userId,
           name: entry.name,
           warName: entry.profile!.warName,
           rank: entry.profile!.rank,
