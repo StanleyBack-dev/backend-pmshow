@@ -50,9 +50,25 @@ export class UserLookupService {
     return (await this.users.findById(id))?.avatarKey ?? null;
   }
 
+  /** Photo keys of many accounts at once (lists of people). */
+  avatarKeysOf(ids: readonly string[]): Promise<Map<string, string>> {
+    return this.users.avatarKeys(ids);
+  }
+
   /** Profile photo of an account (key in the object storage). */
   async setAvatarKey(id: string, avatarKey: string | null): Promise<void> {
     await this.users.update(id, { avatarKey });
+  }
+
+  /** Whether the person already saw (or skipped) the guided tour. */
+  async onboardingCompleted(id: string): Promise<boolean> {
+    return Boolean((await this.users.findById(id))?.onboardingCompletedAt);
+  }
+
+  /** Marks the guided tour as seen (the first time only). */
+  async completeOnboarding(id: string): Promise<void> {
+    if (await this.onboardingCompleted(id)) return;
+    await this.users.update(id, { onboardingCompletedAt: new Date() });
   }
 
   async findById(id: string): Promise<UserSummary | null> {

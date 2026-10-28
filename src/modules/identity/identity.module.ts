@@ -49,6 +49,7 @@ import { SessionTypeormRepository } from "@/modules/identity/infrastructure/pers
 import { UserTypeormRepository } from "@/modules/identity/infrastructure/persistence/typeorm/repositories/user-typeorm.repository";
 import { VerificationCodeTypeormRepository } from "@/modules/identity/infrastructure/persistence/typeorm/repositories/verification-code-typeorm.repository";
 import { AuthResolver } from "@/modules/identity/presentation/graphql/auth.resolver";
+import { OnboardingResolver } from "@/modules/identity/presentation/graphql/onboarding.resolver";
 import { UserAccountFieldsResolver } from "@/modules/identity/presentation/graphql/user-account-fields.resolver";
 import { UsersAdminResolver } from "@/modules/identity/presentation/graphql/users-admin.resolver";
 import { FirstAccessGuard } from "@/modules/identity/presentation/guards/first-access.guard";
@@ -107,6 +108,7 @@ import { MailModule } from "@/modules/mails/mail.module";
     AuthResolver,
     UsersAdminResolver,
     UserAccountFieldsResolver,
+    OnboardingResolver,
     UserSessionGuard,
     FirstAccessGuard,
   ],

@@ -10,7 +10,16 @@ export type NewUser = {
 };
 
 export type UserPatch = Partial<
-  Pick<User, "name" | "email" | "username" | "group" | "active" | "avatarKey">
+  Pick<
+    User,
+    | "name"
+    | "email"
+    | "username"
+    | "group"
+    | "active"
+    | "avatarKey"
+    | "onboardingCompletedAt"
+  >
 >;
 
 export type UserFilter = {
@@ -43,6 +52,8 @@ export interface UserRepositoryPort {
     page: PageRequest,
   ): Promise<Paginated<UserAccount>>;
   countActiveInGroup(group: UserGroup): Promise<number>;
+  /** Profile photo keys of these users (only those with a photo). */
+  avatarKeys(ids: readonly string[]): Promise<Map<string, string>>;
   /** Ids of every enabled account (only those of `group`, when given). */
   listActiveIds(group?: UserGroup): Promise<string[]>;
   /** User and credential in one transaction. */

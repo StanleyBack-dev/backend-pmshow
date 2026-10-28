@@ -14,6 +14,8 @@ export type User = {
   lastLoginAt: Date | null;
   /** Profile photo in the object storage (null: none). */
   avatarKey: string | null;
+  /** When the guided tour was finished or skipped (null: not yet). */
+  onboardingCompletedAt: Date | null;
 };
 
 /** Login state kept apart from the profile (tb_auth_credentials). */

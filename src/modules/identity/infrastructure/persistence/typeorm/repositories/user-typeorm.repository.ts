@@ -1,6 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
-import { Brackets, type DataSource, type Repository } from "typeorm";
+import {
+  Brackets,
+  In,
+  Not,
+  IsNull,
+  type DataSource,
+  type Repository,
+} from "typeorm";
 import type { UserGroup } from "@/modules/access-control/domain/user-group";
 import type {
   NewCredential,
@@ -31,6 +38,7 @@ const toUser = (row: UserOrmEntity): User => ({
   deactivatedAt: row.deactivatedAt,
   lastLoginAt: row.lastLoginAt,
   avatarKey: row.avatarKey,
+  onboardingCompletedAt: row.onboardingCompletedAt,
 });
 
 type AccountRaw = {
@@ -86,6 +94,15 @@ export class UserTypeormRepository implements UserRepositoryPort {
 
   countActiveInGroup(group: UserGroup): Promise<number> {
     return this.repository.count({ where: { group, active: true } });
+  }
+
+  async avatarKeys(ids: readonly string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.repository.find({
+      where: { id: In([...ids]), avatarKey: Not(IsNull()) },
+      select: { id: true, avatarKey: true },
+    });
+    return new Map(rows.map((row) => [row.id, row.avatarKey as string]));
   }
 
   async listActiveIds(group?: UserGroup): Promise<string[]> {
