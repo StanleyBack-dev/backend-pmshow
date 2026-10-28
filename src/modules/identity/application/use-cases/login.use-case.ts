@@ -1,3 +1,4 @@
+import { reportSystemEvent } from "@/common/logging/system-events";
 import { Inject, Injectable } from "@nestjs/common";
 import { APP_ERRORS } from "@/common/exceptions/app-errors.catalog";
 import { AppException } from "@/common/exceptions/app-exception";
@@ -91,7 +92,19 @@ export class LoginUseCase {
       await this.throttle.failedLogin(meta.ipAddress);
       const next = afterFailedLogin(credential, now, this.config.lockout);
       await this.credentials.update(user.id, next);
-      if (next.lockedUntil) throw this.lockedError(next.lockedUntil, now);
+      if (next.lockedUntil) {
+        reportSystemEvent({
+          level: "WARN",
+          category: "SECURITY",
+          source: "Login: conta bloqueada",
+          message:
+            "Uma conta foi bloqueada após várias tentativas de senha errada.",
+          userId: user.id,
+          ip: meta.ipAddress,
+          alert: true,
+        });
+        throw this.lockedError(next.lockedUntil, now);
+      }
       throw AppException.from(
         APP_ERRORS.identity.invalidCredentials,
         undefined,

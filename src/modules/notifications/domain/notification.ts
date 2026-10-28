@@ -30,6 +30,8 @@ export enum NotificationType {
   SUPPORT_ANSWERED = "SUPPORT_ANSWERED",
   /** Your support request was closed. */
   SUPPORT_FINALIZED = "SUPPORT_FINALIZED",
+  /** For ADMIN_MASTER: errors, security events, failed routines. */
+  SYSTEM_ALERT = "SYSTEM_ALERT",
   /** For ADMIN_MASTER: a sign-up from the public link awaits review. */
   ENROLLMENT_SUBMITTED = "ENROLLMENT_SUBMITTED",
 }

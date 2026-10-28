@@ -126,6 +126,15 @@ export class MemberProfileType {
   @Field(() => String, { nullable: true })
   notes!: string | null;
 
+  @Field(() => String, { nullable: true, description: "AAAA-MM-DD." })
+  birthDate!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Ingresso na banda (AAAA-MM-DD).",
+  })
+  joinedOn!: string | null;
+
   @Field(() => [MemberInstrumentType])
   instruments!: MemberInstrumentType[];
 
@@ -250,6 +259,24 @@ export class MemberProfileInput {
   @Type(() => MemberInstrumentInput)
   instruments!: MemberInstrumentInput[];
 
+  @Field(() => String, {
+    nullable: true,
+    description: "AAAA-MM-DD; ausente = mantém a atual.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  birthDate?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Ingresso na banda (AAAA-MM-DD); ausente = mantém.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  joinedOn?: string | null;
+
   @Field(() => [ID], {
     nullable: true,
     description: "Funções na banda; ausente = mantém as atuais.",
@@ -290,4 +317,37 @@ export class UpdateInstrumentInput {
   @IsOptional()
   @IsBoolean()
   archived?: boolean;
+}
+
+@ObjectType("BandDates", {
+  description:
+    "Aniversário e ingresso na banda (YYYY-MM-DD), de qualquer usuário.",
+})
+export class BandDatesType {
+  @Field(() => String, { nullable: true })
+  birthDate!: string | null;
+
+  @Field(() => String, { nullable: true })
+  joinedOn!: string | null;
+}
+
+@ObjectType("Birthday", { description: "Aniversariante do mês." })
+export class BirthdayType {
+  @Field(() => ID)
+  userId!: string;
+
+  @Field()
+  name!: string;
+
+  @Field()
+  warName!: string;
+
+  @Field(() => Rank, {
+    nullable: true,
+    description: "Vazio para quem não tem cadastro na banda.",
+  })
+  rank!: Rank | null;
+
+  @Field(() => Int, { description: "Dia do mês." })
+  day!: number;
 }

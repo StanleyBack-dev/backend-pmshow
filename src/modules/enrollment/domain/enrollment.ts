@@ -40,6 +40,8 @@ export type EnrollmentData = {
   /** CIVIL for civilians. */
   rank: Rank;
   warName: string;
+  /** YYYY-MM-DD (required on new sign-ups; null on older ones). */
+  birthDate: string | null;
   instruments: EnrollmentInstrumentChoice[];
 };
 

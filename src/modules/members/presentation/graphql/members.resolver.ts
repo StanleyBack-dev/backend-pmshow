@@ -1,11 +1,15 @@
 import { ParseUUIDPipe } from "@nestjs/common";
-import { Args, ID, Mutation, Query, Resolver } from "@nestjs/graphql";
+import { Args, ID, Int, Mutation, Query, Resolver } from "@nestjs/graphql";
 import type { AuthenticatedUser } from "@/common/auth/authenticated-user";
 import { CurrentUser } from "@/common/decorators/current-user.decorator";
 import { PageInput } from "@/common/graphql/pagination.graphql";
 import { Permission } from "@/modules/access-control/domain/permission";
 import { RequirePermissions } from "@/modules/access-control/presentation/decorators/require-permissions.decorator";
-import type { RosterEntry } from "@/modules/members/application/ports/member-repository.port";
+import type {
+  BandDates,
+  Birthday,
+  RosterEntry,
+} from "@/modules/members/application/ports/member-repository.port";
 import { InstrumentsUseCase } from "@/modules/members/application/use-cases/instruments.use-cases";
 import { MembersUseCase } from "@/modules/members/application/use-cases/members.use-cases";
 import type {
@@ -14,6 +18,8 @@ import type {
   MemberProfile,
 } from "@/modules/members/domain/member";
 import {
+  BandDatesType,
+  BirthdayType,
   CreateInstrumentInput,
   InstrumentFilterInput,
   InstrumentPage,
@@ -63,6 +69,46 @@ export class MembersResolver {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<MemberProfile | null> {
     return this.members.profileOf(user.id);
+  }
+
+  @Query(() => [BirthdayType], {
+    description: "Aniversariantes do mês (1-12; padrão: o mês atual).",
+  })
+  birthdays(
+    @Args("month", { type: () => Int, nullable: true }) month?: number | null,
+  ): Promise<Birthday[]> {
+    const current = Number(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Sao_Paulo",
+        month: "numeric",
+      }).format(new Date()),
+    );
+    const chosen = month && month >= 1 && month <= 12 ? month : current;
+    return this.members.birthdays(chosen);
+  }
+
+  @Query(() => BandDatesType, {
+    description: "Aniversário e ingresso na banda do próprio usuário.",
+  })
+  myBandDates(@CurrentUser() user: AuthenticatedUser): Promise<BandDates> {
+    return this.members.myDates(user);
+  }
+
+  @Mutation(() => BandDatesType, {
+    description:
+      "O próprio usuário informa o aniversário e a data de ingresso na banda (opcionais).",
+  })
+  updateMyBandDates(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args("birthDate", { type: () => String, nullable: true })
+    birthDate: string | null,
+    @Args("joinedOn", { type: () => String, nullable: true })
+    joinedOn: string | null,
+  ): Promise<BandDates> {
+    return this.members.saveOwnDates(user, {
+      birthDate: birthDate?.slice(0, 10) || null,
+      joinedOn: joinedOn?.slice(0, 10) || null,
+    });
   }
 
   @RequirePermissions(Permission.MEMBERS_MANAGE)

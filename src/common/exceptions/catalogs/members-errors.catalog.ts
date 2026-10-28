@@ -11,6 +11,11 @@ export const membersErrors = {
     status: HttpStatus.NOT_FOUND,
     message: "Este integrante ainda não tem cadastro na banda.",
   },
+  invalidDate: {
+    code: "MEMBER_INVALID_DATE",
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: (params: { reason: string }) => params.reason,
+  },
   invalidPhone: {
     code: "MEMBER_INVALID_PHONE",
     status: HttpStatus.UNPROCESSABLE_ENTITY,

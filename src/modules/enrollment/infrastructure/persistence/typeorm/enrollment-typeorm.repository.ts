@@ -58,6 +58,7 @@ const toRequest = (row: EnrollmentRequestOrmEntity): EnrollmentRequest => ({
   militaryId: row.militaryId,
   rank: row.rank,
   warName: row.warName,
+  birthDate: row.birthDate,
   instruments: row.instruments,
   consentAt: row.consentAt,
   createdAt: row.createdAt,

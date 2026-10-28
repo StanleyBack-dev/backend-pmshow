@@ -54,3 +54,21 @@ jobs:
           DATABASE_URL: ${{ secrets.BETA_DATABASE_URL }}
           DB_SSL: "true"
         run: npm run migration:run:prod
+
+      # Tells the ADMIN_MASTER (app and e-mail) through the API; skipped
+      # when API_URL/CRON_SECRET are not set in this repository.
+      - name: Alert the administrators
+        if: failure()
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$API_URL" ] || [ -z "$CRON_SECRET" ]; then exit 0; fi
+          jq -n --arg workflow "$GITHUB_WORKFLOW" --arg job "$GITHUB_JOB" \
+            --arg runUrl "$RUN_URL" --arg branch "$GITHUB_REF_NAME" \
+            '{workflow: $workflow, job: $job, runUrl: $runUrl, branch: $branch}' |
+            curl --silent --show-error --max-time 30 -X POST \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              -H "Content-Type: application/json" --data @- \
+              "$API_URL/internal/alerts/routine-failed" || true

@@ -7,7 +7,8 @@ import {
   Logger,
 } from "@nestjs/common";
 import type { GqlContextType } from "@nestjs/graphql";
-import type { Response } from "express";
+import type { Request, Response } from "express";
+import { reportSystemEvent } from "@/common/logging/system-events";
 import { redact } from "@/common/logging/redact";
 
 interface ErrorBody {
@@ -36,12 +37,32 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     // Known business errors (e.g. 503 "not configured") log one line; only
     // unexpected failures get a stack trace.
+    const request = host.switchToHttp().getRequest<Request>();
+    const source = `${request.method} ${request.path ?? request.url}`;
     if (!(exception instanceof HttpException)) {
       const reason =
         exception instanceof Error ? exception.stack : String(exception);
       this.logger.error(redact(`${body.code}: ${reason}`));
+      reportSystemEvent({
+        level: "ERROR",
+        category: "API",
+        source,
+        message:
+          exception instanceof Error ? exception.message : String(exception),
+        statusCode: body.statusCode,
+        details: { stack: redact(reason ?? "").slice(0, 2000) },
+        alert: true,
+      });
     } else if (body.statusCode >= 500) {
       this.logger.warn(redact(`${body.code}: ${body.message}`));
+      reportSystemEvent({
+        level: "ERROR",
+        category: "API",
+        source,
+        message: `${body.code}: ${body.message}`,
+        statusCode: body.statusCode,
+        alert: true,
+      });
     }
 
     response.status(body.statusCode).json(body);

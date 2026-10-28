@@ -1,7 +1,10 @@
 import { Context, Parent, ResolveField, Resolver } from "@nestjs/graphql";
 import { requestLoader } from "@/common/graphql/request-loader";
 import { AbsenceGqlType } from "@/modules/availability/presentation/graphql/availability.graphql-types";
-import { RosterEntryType } from "@/modules/members/presentation/graphql/members.graphql-types";
+import {
+  BirthdayType,
+  RosterEntryType,
+} from "@/modules/members/presentation/graphql/members.graphql-types";
 import { PhotoLinksService } from "@/modules/profile-photos/application/photo-links.service";
 import { RosterCandidateType } from "@/modules/rosters/presentation/graphql/rosters.graphql-types";
 import { RosterPersonType } from "@/modules/rosters/presentation/graphql/rosters.resolver";
@@ -82,5 +85,21 @@ export class AbsencePhotoResolver {
     @Context() context: object,
   ): Promise<string | null> {
     return photoOf(this.links, context, absence.userId);
+  }
+}
+
+@Resolver(() => BirthdayType)
+export class BirthdayPhotoResolver {
+  constructor(private readonly links: PhotoLinksService) {}
+
+  @ResolveField(() => String, {
+    nullable: true,
+    description: PHOTO_DESCRIPTION,
+  })
+  photoUrl(
+    @Parent() birthday: { userId: string },
+    @Context() context: object,
+  ): Promise<string | null> {
+    return photoOf(this.links, context, birthday.userId);
   }
 }

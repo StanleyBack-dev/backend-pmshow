@@ -1,3 +1,4 @@
+import { reportSystemEvent } from "@/common/logging/system-events";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { OutboxHandlers } from "@/modules/outbox/application/outbox-handlers";
 import {
@@ -106,6 +107,15 @@ export class OutboxDispatcher {
       const plan = nextAttempt(message.attempts, this.clock.now());
       if (plan === "give-up") {
         await this.outbox.markFailed(message.id, reason);
+        reportSystemEvent({
+          level: "ERROR",
+          category: "OUTBOX",
+          source: `Outbox: ${message.topic}`,
+          message: `Mensagem não entregue após ${message.attempts} tentativas: ${reason}`,
+          details: { messageId: message.id, topic: message.topic },
+          // A failing alert e-mail would alert again: not for alerts.
+          alert: message.payload.type !== "SYSTEM_ALERT",
+        });
         this.logger.error(
           `Outbox: ${message.topic} ${message.id} desistiu após ${message.attempts} tentativas: ${reason}`,
         );

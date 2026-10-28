@@ -65,6 +65,10 @@ import {
   type RateLimitPort,
 } from "@/shared/application/ports/rate-limit.port";
 import { rateStatus, type RateRule } from "@/shared/domain/rate-limit";
+import {
+  BIRTH_DATE_MESSAGES,
+  checkBirthDate,
+} from "@/modules/members/domain/member-dates";
 
 /** Time to fill in the form after typing the code. */
 const FORM_TTL_MINUTES = 60;
@@ -83,6 +87,7 @@ export type EnrollmentInput = {
   militaryId?: string | null;
   rank?: Rank | null;
   warName: string;
+  birthDate: string;
   instruments: { instrumentId: string; primary: boolean }[];
 };
 
@@ -119,6 +124,17 @@ async function validateEnrollment(
   const warName = normalizeWarName(input.warName);
   if (warName.length < 2 || warName.length > 60) throw error("invalidWarName");
 
+  // The birthday is required on the form (the home page lists them).
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date());
+  const birth = checkBirthDate(input.birthDate?.slice(0, 10) ?? "", today);
+  if (birth) {
+    throw AppException.from(APP_ERRORS.members.invalidDate, {
+      reason: BIRTH_DATE_MESSAGES[birth],
+    });
+  }
+
   const instruments = normalizeInstrumentSelection(input.instruments);
   if (instruments === "multiple-primary") {
     throw AppException.from(
@@ -140,6 +156,7 @@ async function validateEnrollment(
     militaryId,
     rank,
     warName,
+    birthDate: input.birthDate.slice(0, 10),
     instruments,
   };
 }
@@ -488,6 +505,7 @@ export class EnrollmentReviewUseCase {
       warName: data.warName,
       rank: data.rank,
       phone: data.phone,
+      birthDate: data.birthDate,
       // The instrument decides the section; the manager can change it later.
       section: section ?? instruments[0]!.section,
       status: MemberStatus.ATIVO,

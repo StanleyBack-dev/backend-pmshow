@@ -5,6 +5,7 @@ import { OwnPhotoUseCase } from "@/modules/profile-photos/application/own-photo.
 import { PhotoLinksService } from "@/modules/profile-photos/application/photo-links.service";
 import {
   AbsencePhotoResolver,
+  BirthdayPhotoResolver,
   RosterCandidatePhotoResolver,
   RosterEntryPhotoResolver,
   RosterPersonPhotoResolver,
@@ -25,6 +26,7 @@ import { ProfilePhotosResolver } from "@/modules/profile-photos/presentation/gra
     RosterPersonPhotoResolver,
     RosterCandidatePhotoResolver,
     AbsencePhotoResolver,
+    BirthdayPhotoResolver,
   ],
 })
 export class ProfilePhotosModule {}

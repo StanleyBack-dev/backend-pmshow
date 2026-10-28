@@ -99,6 +99,9 @@ export class EnrollmentRequestType {
   @Field()
   warName!: string;
 
+  @Field(() => String, { nullable: true, description: "AAAA-MM-DD." })
+  birthDate!: string | null;
+
   @Field(() => [EnrollmentInstrumentChoiceType])
   instruments!: EnrollmentInstrumentChoiceType[];
 
@@ -203,6 +206,11 @@ export class EnrollmentDataInput {
   @IsString()
   @MaxLength(60)
   warName!: string;
+
+  @Field({ description: "Data de nascimento (AAAA-MM-DD)." })
+  @IsString()
+  @MaxLength(10)
+  birthDate!: string;
 
   @Field(() => [EnrollmentInstrumentInput])
   @ValidateNested({ each: true })
