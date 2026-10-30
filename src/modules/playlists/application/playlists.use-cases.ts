@@ -12,6 +12,7 @@ import {
   PLAYLIST_LIMITS,
   canSee,
   normalizePlaylist,
+  playlistSongIds,
   type PlaylistDraft,
   type PlaylistViolation,
 } from "@/modules/playlists/domain/playlist";
@@ -21,7 +22,9 @@ const VIOLATION_MESSAGES: Record<PlaylistViolation, string> = {
   "name-required": "Dê um nome à playlist (pelo menos 2 caracteres).",
   "name-too-long": `O nome pode ter até ${PLAYLIST_LIMITS.name} caracteres.`,
   "description-too-long": `A descrição pode ter até ${PLAYLIST_LIMITS.description} caracteres.`,
-  "too-many-songs": `Uma playlist pode ter até ${PLAYLIST_LIMITS.songs} músicas.`,
+  "too-many-items": `Uma playlist pode ter até ${PLAYLIST_LIMITS.items} músicas e vídeos.`,
+  "invalid-video":
+    "Um dos vídeos do YouTube da lista é inválido. Busque-o de novo.",
 };
 
 @Injectable()
@@ -82,7 +85,8 @@ export class PlaylistsUseCase {
     return playlist;
   }
 
-  // Clean draft whose songs exist and are not archived.
+  // Clean draft whose songs of the repertoire exist and are not archived
+  // (the YouTube videos are checked by the domain).
   private async valid(draft: PlaylistDraft) {
     const result = normalizePlaylist(draft);
     if (!result.ok) {
@@ -90,11 +94,12 @@ export class PlaylistsUseCase {
         reason: VIOLATION_MESSAGES[result.violation],
       });
     }
-    const found = await this.songs.findMany(result.value.songIds);
+    const songIds = playlistSongIds(result.value.items);
+    const found = await this.songs.findMany(songIds);
     const usable = new Set(
       found.filter((song) => !song.archivedAt).map((song) => song.id),
     );
-    if (result.value.songIds.some((id) => !usable.has(id))) {
+    if (songIds.some((id) => !usable.has(id))) {
       throw AppException.from(APP_ERRORS.playlists.unknownSongs, undefined);
     }
     return result.value;

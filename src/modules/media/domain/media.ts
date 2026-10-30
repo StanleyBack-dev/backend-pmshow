@@ -70,6 +70,10 @@ export function downloadFileName(title: string, extension: string): string {
 // --- YouTube ------------------------------------------------------------
 
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+
+/** Whether `value` has the shape of a YouTube video id. */
+export const isYoutubeVideoId = (value: string): boolean =>
+  VIDEO_ID.test(value);
 const YOUTUBE_HOSTS = new Set([
   "youtube.com",
   "www.youtube.com",

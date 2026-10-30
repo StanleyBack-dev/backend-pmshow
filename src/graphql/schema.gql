@@ -901,12 +901,22 @@ type NotificationPreference {
   emailEnabled: Boolean!
 }
 
-"""Música da playlist, na ordem."""
-type PlaylistSong {
-  position: Int!
-  songId: ID!
+"""Vídeo do YouTube guardado só na playlist (não é música do repertório)."""
+type PlaylistVideo {
+  videoId: String!
+  title: String!
+  channelTitle: String
+}
 
-  """null se a música foi apagada."""
+"""Item da playlist, na ordem: uma música do repertório ou um vídeo."""
+type PlaylistItem {
+  position: Int!
+
+  """Música do repertório."""
+  songId: ID
+  video: PlaylistVideo
+
+  """Música do repertório; null nos vídeos."""
   song: Song
 }
 
@@ -920,8 +930,10 @@ type Playlist {
   shared: Boolean!
   ownerId: ID!
   ownerName: String!
-  songCount: Int!
-  songs: [PlaylistSong!]!
+
+  """Músicas e vídeos."""
+  itemCount: Int!
+  items: [PlaylistItem!]!
   updatedAt: DateTime!
 }
 
@@ -1971,8 +1983,20 @@ input PlaylistInput {
   description: String
   shared: Boolean!
 
-  """Músicas na ordem em que tocam."""
-  songIds: [ID!]!
+  """Na ordem em que tocam."""
+  items: [PlaylistItemInput!]!
+}
+
+"""Uma música do repertório ou um vídeo."""
+input PlaylistItemInput {
+  songId: ID
+  video: PlaylistVideoInput
+}
+
+input PlaylistVideoInput {
+  videoId: String!
+  title: String!
+  channelTitle: String
 }
 
 input SongInput {

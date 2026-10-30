@@ -85,6 +85,34 @@ export function normalizeFullName(value: string): string | null {
     : null;
 }
 
+// Connectors kept in lowercase inside a name ("João de Paula").
+const NAME_PARTICLES = new Set(["da", "das", "de", "di", "do", "dos", "e"]);
+
+/**
+ * The name as the project writes names, however it was typed (often all in
+ * capitals): each word with only its first letter in uppercase, the
+ * connectors in lowercase. "STANLEY BARROS RODRIGUES" → "Stanley Barros
+ * Rodrigues"; "joão DE paula" → "João de Paula"; "ana-maria d'ávila" →
+ * "Ana-Maria D'Ávila".
+ */
+export function capitalizeFullName(value: string): string {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("pt-BR")
+    .split(" ")
+    .map((word, index) =>
+      index > 0 && NAME_PARTICLES.has(word)
+        ? word
+        : word.replace(
+            /(^|[-'’])(\p{L})/gu,
+            (_, before: string, letter: string) =>
+              before + letter.toLocaleUpperCase("pt-BR"),
+          ),
+    )
+    .join(" ");
+}
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function isValidEmail(value: string): boolean {

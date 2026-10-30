@@ -6,13 +6,28 @@ import type {
   PlaylistRepositoryPort,
   PlaylistView,
 } from "@/modules/playlists/application/ports/playlist-repository.port";
-import type { Playlist } from "@/modules/playlists/domain/playlist";
+import type {
+  Playlist,
+  PlaylistItem,
+} from "@/modules/playlists/domain/playlist";
 import {
+  PlaylistItemOrmEntity,
   PlaylistOrmEntity,
-  PlaylistSongOrmEntity,
 } from "@/modules/playlists/infrastructure/persistence/typeorm/playlist.orm-entity";
 
 type PlaylistRow = PlaylistOrmEntity & { ownerName: string };
+
+const toItem = (row: PlaylistItemOrmEntity): PlaylistItem =>
+  row.songId
+    ? { kind: "song", songId: row.songId }
+    : {
+        kind: "video",
+        video: {
+          videoId: row.videoId ?? "",
+          title: row.videoTitle ?? "",
+          channelTitle: row.videoChannel,
+        },
+      };
 
 @Injectable()
 export class PlaylistTypeormRepository implements PlaylistRepositoryPort {
@@ -42,7 +57,7 @@ export class PlaylistTypeormRepository implements PlaylistRepositoryPort {
           shared: playlist.shared,
         }),
       );
-      await this.writeSongs(manager, saved.id, playlist.songIds);
+      await this.writeItems(manager, saved.id, playlist.items);
       return saved.id;
     });
     return this.mustFind(id);
@@ -50,7 +65,7 @@ export class PlaylistTypeormRepository implements PlaylistRepositoryPort {
 
   async update(
     id: string,
-    data: Pick<Playlist, "name" | "description" | "shared" | "songIds">,
+    data: Pick<Playlist, "name" | "description" | "shared" | "items">,
   ): Promise<PlaylistView> {
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(PlaylistOrmEntity).update(
@@ -62,10 +77,10 @@ export class PlaylistTypeormRepository implements PlaylistRepositoryPort {
           updatedAt: new Date(),
         },
       );
-      await manager.getRepository(PlaylistSongOrmEntity).delete({
+      await manager.getRepository(PlaylistItemOrmEntity).delete({
         playlistId: id,
       });
-      await this.writeSongs(manager, id, data.songIds);
+      await this.writeItems(manager, id, data.items);
     });
     return this.mustFind(id);
   }
@@ -74,22 +89,25 @@ export class PlaylistTypeormRepository implements PlaylistRepositoryPort {
     await this.dataSource.getRepository(PlaylistOrmEntity).delete({ id });
   }
 
-  private async writeSongs(
+  private async writeItems(
     manager: EntityManager,
     playlistId: string,
-    songIds: readonly string[],
+    items: readonly PlaylistItem[],
   ): Promise<void> {
-    if (songIds.length === 0) return;
-    await manager.getRepository(PlaylistSongOrmEntity).insert(
-      songIds.map((songId, index) => ({
+    if (items.length === 0) return;
+    await manager.getRepository(PlaylistItemOrmEntity).insert(
+      items.map((item, index) => ({
         playlistId,
-        songId,
         position: index + 1,
+        songId: item.kind === "song" ? item.songId : null,
+        videoId: item.kind === "video" ? item.video.videoId : null,
+        videoTitle: item.kind === "video" ? item.video.title : null,
+        videoChannel: item.kind === "video" ? item.video.channelTitle : null,
       })),
     );
   }
 
-  // The owner's name comes from tb_users (identity), read-only; the songs in
+  // The owner's name comes from tb_users (identity), read-only; the items in
   // one query for every playlist listed.
   private async query(
     where: string,
@@ -107,17 +125,15 @@ export class PlaylistTypeormRepository implements PlaylistRepositoryPort {
       params,
     );
     if (rows.length === 0) return [];
-    const songs = await this.dataSource
-      .getRepository(PlaylistSongOrmEntity)
+    const items = await this.dataSource
+      .getRepository(PlaylistItemOrmEntity)
       .find({
         where: { playlistId: In(rows.map((row) => row.id)) },
         order: { position: "ASC" },
       });
     return rows.map((row) => ({
       ...row,
-      songIds: songs
-        .filter((song) => song.playlistId === row.id)
-        .map((song) => song.songId),
+      items: items.filter((item) => item.playlistId === row.id).map(toItem),
     }));
   }
 

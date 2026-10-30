@@ -9,10 +9,10 @@ export interface PlaylistRepositoryPort {
   listVisible(userId: string): Promise<PlaylistView[]>;
   findById(id: string): Promise<PlaylistView | null>;
   create(playlist: NewPlaylist): Promise<PlaylistView>;
-  /** Replaces the data and the songs (in order) in one transaction. */
+  /** Replaces the data and the items (in order) in one transaction. */
   update(
     id: string,
-    data: Pick<Playlist, "name" | "description" | "shared" | "songIds">,
+    data: Pick<Playlist, "name" | "description" | "shared" | "items">,
   ): Promise<PlaylistView>;
   delete(id: string): Promise<void>;
 }
