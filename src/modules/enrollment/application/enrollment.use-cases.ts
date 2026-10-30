@@ -11,6 +11,7 @@ import {
   type EnrollmentRequestFilter,
 } from "@/modules/enrollment/application/ports/enrollment-repository.port";
 import {
+  capitalizeFullName,
   CIVIL_USERNAME_DIGITS,
   civilUsername,
   enrollmentPhotoKey,
@@ -313,8 +314,11 @@ export class PublicEnrollmentUseCase {
       throw AppException.from(APP_ERRORS.enrollment.consentRequired, undefined);
     }
     await this.consume("submit", ip);
-    const data = await validateEnrollment(input, () =>
-      this.instruments.list(false),
+    // Only the public form: on approval the manager's spelling is kept
+    // (exceptions like "McDonald" stay possible).
+    const data = await validateEnrollment(
+      { ...input, fullName: capitalizeFullName(input.fullName) },
+      () => this.instruments.list(false),
     );
 
     if (

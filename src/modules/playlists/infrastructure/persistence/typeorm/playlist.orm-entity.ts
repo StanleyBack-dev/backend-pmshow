@@ -31,14 +31,41 @@ export class PlaylistOrmEntity {
   updatedAt!: Date;
 }
 
-@Entity("tb_playlist_songs")
-export class PlaylistSongOrmEntity {
+// A line of the playlist: a song of the repertoire (idtb_songs) or a
+// YouTube video kept only here (youtube_*); the table checks it is one of
+// the two.
+@Entity("tb_playlist_items")
+export class PlaylistItemOrmEntity {
   @PrimaryColumn({ name: "idtb_playlists", type: "uuid" })
   playlistId!: string;
 
   @PrimaryColumn({ type: "int" })
   position!: number;
 
-  @Column({ name: "idtb_songs", type: "uuid" })
-  songId!: string;
+  @Column({ name: "idtb_songs", type: "uuid", nullable: true })
+  songId!: string | null;
+
+  @Column({
+    name: "youtube_video_id",
+    type: "varchar",
+    length: 11,
+    nullable: true,
+  })
+  videoId!: string | null;
+
+  @Column({
+    name: "youtube_title",
+    type: "varchar",
+    length: 200,
+    nullable: true,
+  })
+  videoTitle!: string | null;
+
+  @Column({
+    name: "youtube_channel",
+    type: "varchar",
+    length: 120,
+    nullable: true,
+  })
+  videoChannel!: string | null;
 }

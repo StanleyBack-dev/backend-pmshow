@@ -1,4 +1,5 @@
 import {
+  capitalizeFullName,
   civilUsername,
   isInviteOpen,
   isValidEmail,
@@ -34,6 +35,17 @@ describe("enrollment domain", () => {
     ["Jo S", null],
   ])("normalizeFullName(%p) → %p", (value, expected) => {
     expect(normalizeFullName(value)).toBe(expected);
+  });
+
+  it.each([
+    ["STANLEY BARROS RODRIGUES", "Stanley Barros Rodrigues"],
+    ["joão DE paula", "João de Paula"],
+    ["  MARIA   DAS  DORES e SILVA ", "Maria das Dores e Silva"],
+    ["ÂNGELA DOS SANTOS", "Ângela dos Santos"],
+    ["ana-maria d'ávila", "Ana-Maria D'Ávila"],
+    ["Da Costa Lima", "Da Costa Lima"],
+  ])("capitalizeFullName(%p) → %p", (value, expected) => {
+    expect(capitalizeFullName(value)).toBe(expected);
   });
 
   it("validates e-mails", () => {

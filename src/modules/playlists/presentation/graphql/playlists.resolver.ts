@@ -13,34 +13,64 @@ import {
   ResolveField,
   Resolver,
 } from "@nestjs/graphql";
+import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  ValidateNested,
 } from "class-validator";
 import type { AuthenticatedUser } from "@/common/auth/authenticated-user";
 import { CurrentUser } from "@/common/decorators/current-user.decorator";
+import { APP_ERRORS } from "@/common/exceptions/app-errors.catalog";
+import { AppException } from "@/common/exceptions/app-exception";
 import { requestLoader } from "@/common/graphql/request-loader";
 import { Permission } from "@/modules/access-control/domain/permission";
 import { RequirePermissions } from "@/modules/access-control/presentation/decorators/require-permissions.decorator";
 import { PlaylistsUseCase } from "@/modules/playlists/application/playlists.use-cases";
 import type { PlaylistView } from "@/modules/playlists/application/ports/playlist-repository.port";
+import type {
+  PlaylistDraft,
+  PlaylistItem,
+} from "@/modules/playlists/domain/playlist";
 import { SongsUseCase } from "@/modules/repertoire/application/songs.use-cases";
 import type { Song } from "@/modules/repertoire/domain/song";
 import { SongType } from "@/modules/repertoire/presentation/graphql/repertoire.graphql-types";
 
 const Id = () => new ParseUUIDPipe({ version: "4" });
 
-@ObjectType("PlaylistSong", { description: "Música da playlist, na ordem." })
-class PlaylistSongType {
+@ObjectType("PlaylistVideo", {
+  description:
+    "Vídeo do YouTube guardado só na playlist (não é música do repertório).",
+})
+class PlaylistVideoType {
+  @Field()
+  videoId!: string;
+
+  @Field()
+  title!: string;
+
+  @Field(() => String, { nullable: true })
+  channelTitle!: string | null;
+}
+
+@ObjectType("PlaylistItem", {
+  description:
+    "Item da playlist, na ordem: uma música do repertório ou um vídeo.",
+})
+class PlaylistItemType {
   @Field(() => Int)
   position!: number;
 
-  @Field(() => ID)
-  songId!: string;
+  @Field(() => ID, { nullable: true, description: "Música do repertório." })
+  songId!: string | null;
+
+  @Field(() => PlaylistVideoType, { nullable: true })
+  video!: PlaylistVideoType | null;
 }
 
 @ObjectType("Playlist", {
@@ -65,14 +95,47 @@ class PlaylistType {
   @Field()
   ownerName!: string;
 
-  @Field(() => Int)
-  songCount!: number;
+  @Field(() => Int, { description: "Músicas e vídeos." })
+  itemCount!: number;
 
-  @Field(() => [PlaylistSongType])
-  songs!: PlaylistSongType[];
+  @Field(() => [PlaylistItemType])
+  items!: PlaylistItemType[];
 
   @Field()
   updatedAt!: Date;
+}
+
+@InputType()
+class PlaylistVideoInput {
+  @Field()
+  @IsString()
+  @MaxLength(20)
+  videoId!: string;
+
+  @Field()
+  @IsString()
+  @MaxLength(400)
+  title!: string;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  channelTitle?: string | null;
+}
+
+@InputType({ description: "Uma música do repertório ou um vídeo." })
+class PlaylistItemInput {
+  @Field(() => ID, { nullable: true })
+  @IsOptional()
+  @IsUUID("4")
+  songId?: string | null;
+
+  @Field(() => PlaylistVideoInput, { nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PlaylistVideoInput)
+  video?: PlaylistVideoInput | null;
 }
 
 @InputType()
@@ -92,10 +155,43 @@ class PlaylistInput {
   @IsBoolean()
   shared!: boolean;
 
-  @Field(() => [ID], { description: "Músicas na ordem em que tocam." })
+  @Field(() => [PlaylistItemInput], { description: "Na ordem em que tocam." })
+  @IsArray()
   @ArrayMaxSize(400)
-  @IsUUID("4", { each: true })
-  songIds!: string[];
+  @ValidateNested({ each: true })
+  @Type(() => PlaylistItemInput)
+  items!: PlaylistItemInput[];
+}
+
+/** Each line is either a song or a video, never both or neither. */
+function toDraft(input: PlaylistInput): PlaylistDraft {
+  const items = input.items.map((item): PlaylistItem | null => {
+    if (item.songId && !item.video) {
+      return { kind: "song", songId: item.songId };
+    }
+    if (item.video && !item.songId) {
+      return {
+        kind: "video",
+        video: {
+          videoId: item.video.videoId,
+          title: item.video.title,
+          channelTitle: item.video.channelTitle ?? null,
+        },
+      };
+    }
+    return null;
+  });
+  if (items.some((item) => item === null)) {
+    throw AppException.from(APP_ERRORS.playlists.invalid, {
+      reason: "Cada item da playlist é uma música ou um vídeo.",
+    });
+  }
+  return {
+    name: input.name,
+    description: input.description,
+    shared: input.shared,
+    items: items.filter((item): item is PlaylistItem => item !== null),
+  };
 }
 
 const toType = (playlist: PlaylistView): PlaylistType => ({
@@ -105,10 +201,11 @@ const toType = (playlist: PlaylistView): PlaylistType => ({
   shared: playlist.shared,
   ownerId: playlist.ownerId,
   ownerName: playlist.ownerName,
-  songCount: playlist.songIds.length,
-  songs: playlist.songIds.map((songId, index) => ({
+  itemCount: playlist.items.length,
+  items: playlist.items.map((item, index) => ({
     position: index + 1,
-    songId,
+    songId: item.kind === "song" ? item.songId : null,
+    video: item.kind === "video" ? item.video : null,
   })),
   updatedAt: playlist.updatedAt,
 });
@@ -142,7 +239,7 @@ export class PlaylistsResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args("input") input: PlaylistInput,
   ): Promise<PlaylistType> {
-    return toType(await this.useCase.create(user, input));
+    return toType(await this.useCase.create(user, toDraft(input)));
   }
 
   @RequirePermissions(Permission.REPERTOIRE_READ)
@@ -152,7 +249,7 @@ export class PlaylistsResolver {
     @Args("id", { type: () => ID }, Id()) id: string,
     @Args("input") input: PlaylistInput,
   ): Promise<PlaylistType> {
-    return toType(await this.useCase.update(user, id, input));
+    return toType(await this.useCase.update(user, id, toDraft(input)));
   }
 
   @RequirePermissions(Permission.REPERTOIRE_READ)
@@ -166,19 +263,20 @@ export class PlaylistsResolver {
   }
 }
 
-// The song of each line (one query per request for the whole list).
-@Resolver(() => PlaylistSongType)
-export class PlaylistSongFieldsResolver {
+// The song of each song line (one query per request for the whole list).
+@Resolver(() => PlaylistItemType)
+export class PlaylistItemFieldsResolver {
   constructor(private readonly songs: SongsUseCase) {}
 
   @ResolveField(() => SongType, {
     nullable: true,
-    description: "null se a música foi apagada.",
+    description: "Música do repertório; null nos vídeos.",
   })
-  song(
-    @Parent() line: PlaylistSongType,
+  async song(
+    @Parent() line: PlaylistItemType,
     @Context() context: object,
   ): Promise<Song | null> {
+    if (!line.songId) return null;
     return requestLoader(context, "songs", async (ids) => {
       const songs = await this.songs.findMany(ids);
       return new Map(songs.map((song) => [song.id, song]));
